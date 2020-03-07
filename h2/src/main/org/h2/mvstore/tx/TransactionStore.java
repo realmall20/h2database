@@ -52,6 +52,7 @@ public class TransactionStore {
     private final MVMap<String, DataType<?>> typeRegistry;
 
     /**
+     *
      * Undo logs.
      * <p>
      * If the first entry for a transaction doesn't have a logId

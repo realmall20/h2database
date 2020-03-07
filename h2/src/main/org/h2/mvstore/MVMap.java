@@ -454,7 +454,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
 
     /**
      * Remove all entries and return the root reference.
-     *
+     * 清空所有的数据
      * @return the new root reference
      */
     RootReference<K,V> clearIt() {
@@ -463,6 +463,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         while (true) {
             RootReference<K,V> rootReference = flushAndGetRoot();
             if (rootReference.getTotalCount() == 0) {
+                //节点数据为0
                 return rootReference;
             }
             boolean locked = rootReference.isLockedByCurrentThread();
@@ -480,9 +481,11 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                 if (!locked) {
                     rootReference = rootReference.updateRootPage(emptyRootPage, attempt);
                     if (rootReference == null) {
+                        //最终更新成空检点
                         continue;
                     }
                 }
+                //TODO 这方法是干嘛的？
                 store.registerUnsavedMemory(rootPage.removeAllRecursive(version));
                 rootPage = emptyRootPage;
                 return rootReference;
@@ -633,6 +636,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
+     * 设置根路径
      * Set the position of the root page.
      * @param rootPos the position, 0 for empty
      * @param version to set for this map
@@ -1198,6 +1202,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
+     * 刷新数据到磁盘上去
      * If map was used in append mode, this method will ensure that append buffer
      * is flushed - emptied with all entries inserted into map as a new leaf.
      * @param rootReference current RootReference

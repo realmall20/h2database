@@ -791,6 +791,10 @@ public abstract class Page<K,V> implements Cloneable
 
     public abstract int getRawChildPageCount();
 
+    /**
+     * 是否已经存储
+     * @return
+     */
     protected final boolean isPersistent() {
         return memory != IN_MEMORY;
     }
@@ -909,6 +913,7 @@ public abstract class Page<K,V> implements Cloneable
     public abstract CursorPos<K,V> getAppendCursorPos(CursorPos<K,V> cursorPos);
 
     /**
+     * 递归删除所有该版本的数据
      * Remove all page data recursively.
      * @param version at which page got removed
      * @return adjustment for "unsaved memory" amount
@@ -1034,11 +1039,16 @@ public abstract class Page<K,V> implements Cloneable
         }
     }
 
-
+    /**
+     * 非叶子节点
+     * @param <K>
+     * @param <V>
+     */
     private static class NonLeaf<K,V> extends Page<K,V>
     {
         /**
          * The child page references.
+         * 子节点数据
          */
         private PageReference<K,V>[] children;
 
@@ -1202,6 +1212,11 @@ public abstract class Page<K,V> implements Cloneable
             children = newChildren;
         }
 
+        /**
+         * 递归删除所有该版本数据
+         * @param version at which page got removed
+         * @return
+         */
         @Override
         public int removeAllRecursive(long version) {
             int unsavedMemory = removePage(version);

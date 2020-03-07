@@ -52,6 +52,7 @@ public class MVPrimaryIndex extends BaseIndex implements MVIndex<Long,SearchRow>
         RowDataType valueType = table.getRowFactory().getRowDataType();
         mapName = "table." + getId();
         assert db.isStarting() || !db.getStore().getMvStore().getMetaMap().containsKey(DataUtils.META_NAME + mapName);
+        //在这张系统表里面获取事务？
         Transaction t = mvTable.getTransactionBegin();
         dataMap = t.openMap(mapName, keyType, valueType);
         dataMap.map.setVolatile(!table.isPersistData() || !indexType.isPersistent());

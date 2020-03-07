@@ -30,6 +30,7 @@ import org.h2.value.Value;
 import org.h2.value.ValueLob;
 
 /**
+ * 大对象存储？or other？
  * This class stores LOB objects in the database, in maps. This is the back-end
  * i.e. the server side of the LOB storage.
  */

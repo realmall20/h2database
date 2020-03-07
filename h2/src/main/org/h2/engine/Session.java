@@ -671,6 +671,7 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
     }
 
     /**
+     * 提交事务
      * Commit the current transaction. If the statement was not a data
      * definition statement, and if there are temporary tables that should be
      * dropped or truncated at commit, this is done as well.

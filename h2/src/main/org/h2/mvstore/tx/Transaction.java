@@ -109,6 +109,8 @@ public class Transaction {
      * bits 44-41   : status
      * bits 40      : overflow control bit, 1 indicates overflow
      * bits 39-0    : log id of the last entry in the undo log map
+     *
+     * 事务的当前状态
      */
     private final AtomicLong statusAndLogId;
 
