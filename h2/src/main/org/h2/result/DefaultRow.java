@@ -11,9 +11,11 @@ import org.h2.value.ValueBigint;
 
 /**
  * The default implementation of a row in a table.
+ * 表 行数据存贮的基本单位，不是存在mvstore 里面？
  */
 public class DefaultRow extends Row
 {
+    //3 : 表名
     protected final Value[] data;
     private         int     memory;
 

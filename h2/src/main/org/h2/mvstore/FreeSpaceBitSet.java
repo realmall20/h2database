@@ -10,6 +10,7 @@ import java.util.BitSet;
 import org.h2.util.MathUtils;
 
 /**
+ * 空闲空间占位符
  * A free space bit set.
  */
 public class FreeSpaceBitSet {

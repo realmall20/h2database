@@ -59,6 +59,7 @@ import org.h2.value.Value;
 import org.h2.value.ValueRow;
 
 /**
+ * 按照理解，单表查询。
  * This class represents a simple SELECT statement.
  *
  * For each select statement,
@@ -766,7 +767,9 @@ public class Select extends Query {
         boolean lazy = session.isLazyQueryExecution() &&
                 target == null && !isForUpdate && !isQuickAggregateQuery &&
                 fetch != 0 && !fetchPercent && !withTies && offset == 0 && isReadOnly();
+        //字段数据，包括order by 后面的字段
         int columnCount = expressions.size();
+        //构建一个对象 clomns 代表需要查询的列是哪几个列
         LocalResult result = null;
         if (!lazy && (target == null ||
                 !session.getDatabase().getSettings().optimizeInsertFromSelect)) {

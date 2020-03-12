@@ -34,6 +34,7 @@ import org.h2.value.ValueNull;
 import org.h2.value.VersionedValue;
 
 /**
+ *  主键索引
  * A table stored in a MVStore.
  */
 public class MVPrimaryIndex extends BaseIndex implements MVIndex<Long,SearchRow> {
@@ -111,8 +112,10 @@ public class MVPrimaryIndex extends BaseIndex implements MVIndex<Long,SearchRow>
         TransactionMap<Long,SearchRow> map = getMap(session);
         long rowKey = row.getKey();
         try {
+            //保存数据
             Row old = (Row)map.putIfAbsent(rowKey, row);
             if (old != null) {
+                //如果已经有数据直接报错
                 int errorCode = ErrorCode.CONCURRENT_UPDATE_1;
                 if (map.getImmediate(rowKey) != null || map.getFromSnapshot(rowKey) != null) {
                     // committed

@@ -1785,7 +1785,7 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
 
     /**
      * Get the transaction to use for this session.
-     *
+     * 一个会话代表一个连接
      * @return the transaction
      */
     public Transaction getTransaction() {

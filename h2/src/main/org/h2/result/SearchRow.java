@@ -12,6 +12,7 @@ import org.h2.value.Value;
 import org.h2.value.ValueNull;
 
 /**
+ * 表存储的基本单位
  * The base class for rows stored in a table, and for partial rows stored in the
  * index.
  */

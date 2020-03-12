@@ -81,6 +81,7 @@ import org.h2.value.ValueLob;
 
 /**
  * Helps recovering a corrupted database.
+ *  重新覆盖数据命令
  * @h2.resource
  */
 public class Recover extends Tool implements DataHandler {
@@ -92,6 +93,9 @@ public class Recover extends Tool implements DataHandler {
     private int valueId;
     private boolean trace;
     private boolean transactionLog;
+    /**
+     * 元数据
+     */
     private ArrayList<MetaRecord> schema;
     private HashSet<Integer> objectIdSet;
     private HashMap<Integer, String> tableMap;
@@ -313,12 +317,14 @@ public class Recover extends Tool implements DataHandler {
     }
 
     private void process(String dir, String db) {
+        //获取数据库文件信息
         ArrayList<String> list = FileLister.getDatabaseFiles(dir, db, true);
         if (list.isEmpty()) {
             printNoDatabaseFilesFound(dir, db);
         }
         for (String fileName : list) {
             if (fileName.endsWith(Constants.SUFFIX_PAGE_FILE)) {
+                //还原数据库
                 dumpPageStore(fileName);
             } else if (fileName.endsWith(Constants.SUFFIX_LOB_FILE)) {
                 dumpLob(fileName, false);
@@ -435,6 +441,10 @@ public class Recover extends Tool implements DataHandler {
         databaseName = name;
     }
 
+    /**
+     * 还原数据库
+     * @param fileName
+     */
     private void dumpPageStore(String fileName) {
         setDatabaseName(fileName.substring(0, fileName.length() -
                 Constants.SUFFIX_PAGE_FILE.length()));
@@ -488,6 +498,7 @@ public class Recover extends Tool implements DataHandler {
                 }
                 s.reset();
                 seek(i);
+                //获取一页的数据
                 store.readFully(s.getBytes(), 0, pageSize);
                 CRC32 crc = new CRC32();
                 crc.update(s.getBytes(), 4, pageSize - 4);
@@ -556,6 +567,11 @@ public class Recover extends Tool implements DataHandler {
         }
     }
 
+    /**
+     *  备份数据到 mvStory里面
+     * @param writer
+     * @param fileName
+     */
     private void dumpMVStoreFile(PrintWriter writer, String fileName) {
         writer.println("-- MVStore");
         writer.println("CREATE ALIAS IF NOT EXISTS READ_BLOB_MAP FOR \"" +
@@ -586,6 +602,7 @@ public class Recover extends Tool implements DataHandler {
                 if (!mapName.startsWith("table.")) {
                     continue;
                 }
+                // 从表元数据还原数据
                 String tableId = mapName.substring("table.".length());
                 if (Integer.parseInt(tableId) == 0) {
                     TransactionMap<Value, Value> dataMap = store.begin().openMap(mapName, type, type);
@@ -600,6 +617,7 @@ public class Recover extends Tool implements DataHandler {
                             if (meta.getObjectType() == DbObject.TABLE_OR_VIEW) {
                                 String sql = r.getValue(3).getString();
                                 String name = extractTableOrViewName(sql);
+                                //表名和ID对应关系？
                                 tableMap.put(meta.getId(), name);
                             }
                         } catch (Throwable t) {
@@ -1490,6 +1508,7 @@ public class Recover extends Tool implements DataHandler {
     }
 
     private void writeRow(PrintWriter writer, Data s, Value[] data) {
+        //拼装sql语句，导出sql
         StringBuilder sb = new StringBuilder();
         sb.append("INSERT INTO ").append(storageName).append(" VALUES(");
         for (valueId = 0; valueId < recordLength; valueId++) {
@@ -1528,6 +1547,9 @@ public class Recover extends Tool implements DataHandler {
         }
     }
 
+    /**
+     * 单线程执行，不用考虑线程安全的问题
+     */
     private void resetSchema() {
         schema = new ArrayList<>();
         objectIdSet = new HashSet<>();
@@ -1651,6 +1673,11 @@ public class Recover extends Tool implements DataHandler {
         }
     }
 
+    /**
+     * 从sql 里面获取表名或者视图吗
+     * @param sql
+     * @return
+     */
     private static String extractTableOrViewName(String sql) {
         int indexTable = sql.indexOf(" TABLE ");
         int indexView = sql.indexOf(" VIEW ");

@@ -122,6 +122,7 @@ public class MVTableEngine implements TableEngine {
 
     /**
      * A store with open tables.
+     * 正在使用中的table
      */
     public static class Store {
 

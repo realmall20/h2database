@@ -243,6 +243,7 @@ public class SysProperties {
             Utils.getProperty("h2.maxReconnect", 3);
 
     /**
+     *
      * System property <code>h2.maxMemoryRows</code>
      * (default: 40000 per GB of available RAM).<br />
      * The default maximum number of rows to be kept in memory in a result set.
