@@ -36,6 +36,7 @@ import org.h2.value.ValueBigint;
 import org.h2.value.ValueNull;
 
 /**
+ * 列处理器的具体执行类
  * A table filter represents a table that is used in a query. There is one such
  * object whenever a table (or view) is used in a query. For example the
  * following query has 2 table filters: SELECT * FROM TEST T1, TEST T2.

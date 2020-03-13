@@ -15,7 +15,6 @@ import org.h2.value.ValueBigint;
  */
 public class DefaultRow extends Row
 {
-    //3 : 表名
     protected final Value[] data;
     private         int     memory;
 

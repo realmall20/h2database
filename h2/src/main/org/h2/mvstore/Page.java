@@ -123,7 +123,9 @@ public abstract class Page<K,V> implements Cloneable
      */
     private static final int IN_MEMORY = Integer.MIN_VALUE;
 
-    @SuppressWarnings("rawtypes")
+    /**
+     * 关联的页数据
+     */
     private static final PageReference[] SINGLE_EMPTY = { PageReference.EMPTY };
 
 
@@ -1394,7 +1396,11 @@ public abstract class Page<K,V> implements Cloneable
     }
 
 
-
+    /**
+     * 叶子
+     * @param <K>
+     * @param <V>
+     */
     private static class Leaf<K,V> extends Page<K,V>
     {
         /**

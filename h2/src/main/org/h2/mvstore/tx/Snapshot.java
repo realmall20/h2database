@@ -11,6 +11,7 @@ import org.h2.mvstore.RootReference;
 
 /**
  * Snapshot of the map root and committing transactions.
+ *
  */
 final class Snapshot<K,V> {
 

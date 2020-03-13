@@ -683,13 +683,14 @@ public class TransactionStore {
 
     /**
      * Rollback to an old savepoint.
-     *
+     * 保存到一个老的保存点
      * @param t the transaction
      * @param maxLogId the last log id
      * @param toLogId the log id to roll back to
      */
     void rollbackTo(Transaction t, long maxLogId, long toLogId) {
         int transactionId = t.getId();
+        //没有提交记录
         MVMap<Long,Record<?,?>> undoLog = undoLogs[transactionId];
         RollbackDecisionMaker decisionMaker = new RollbackDecisionMaker(this, transactionId, toLogId, t.listener);
         for (long logId = maxLogId - 1; logId >= toLogId; logId--) {

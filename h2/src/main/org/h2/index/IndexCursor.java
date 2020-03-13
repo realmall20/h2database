@@ -144,6 +144,7 @@ public class IndexCursor implements Cursor {
     }
 
     /**
+     * 索引查询
      * Re-evaluate the start and end values of the index search for rows.
      *
      * @param s the session

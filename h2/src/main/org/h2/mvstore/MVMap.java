@@ -1713,7 +1713,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
 
     /**
      * Add, replace or remove a key-value pair.
-     *
+     * 添加，覆盖或者删除
      * @param key the key (may not be null)
      * @param value new value, it may be null when removal is intended
      * @param decisionMaker command object to make choices during transaction.

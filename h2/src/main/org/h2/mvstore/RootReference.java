@@ -22,6 +22,7 @@ public final class RootReference<K,V>
     public final Page<K,V> root;
     /**
      * The version used for writing.
+     * 版本号
      */
     public final long version;
     /**
@@ -40,10 +41,12 @@ public final class RootReference<K,V>
     volatile RootReference<K,V> previous;
     /**
      * Counter for successful root updates.
+     * 更新成功次数
      */
     final long updateCounter;
     /**
      * Counter for attempted root updates.
+     * 尝试更新次数
      */
     final long updateAttemptCounter;
     /**

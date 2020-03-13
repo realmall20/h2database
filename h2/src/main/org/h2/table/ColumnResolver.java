@@ -11,6 +11,7 @@ import org.h2.expression.ExpressionColumn;
 import org.h2.value.Value;
 
 /**
+ * 列数据处理器
  * A column resolver is list of column (for example, a table) that can map a
  * column name to an actual column.
  */

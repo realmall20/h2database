@@ -532,6 +532,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         BitSet committingTransactions = holder.get();
         while (true) {
             BitSet prevCommittingTransactions = committingTransactions;
+            //TODO 这个读是读取镜像吗？
             RootReference<K,VersionedValue<V>> root = map.getRoot();
             committingTransactions = holder.get();
             if (committingTransactions == prevCommittingTransactions) {
@@ -835,6 +836,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
     }
 
     /**
+     *
      * The iterator for read committed isolation level. Can also be used on
      * higher levels when the transaction doesn't have own changes.
      *
