@@ -13,6 +13,7 @@ import java.util.TreeMap;
 /**
  * A storage mechanism that "persists" data in the off-heap area of the main
  * memory.
+ * 堆外内存
  */
 public class OffHeapStore extends FileStore {
 

@@ -37,6 +37,7 @@ public final class RootReference<K,V>
      * Reference to the previous root in the chain.
      * That is the last root of the previous version, which had any data changes.
      * Versions without any data changes are dropped from the chain, as it built.
+     * 上一个版本的数据
      */
     volatile RootReference<K,V> previous;
     /**

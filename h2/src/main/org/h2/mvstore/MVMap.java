@@ -44,8 +44,17 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     private final AtomicReference<RootReference<K,V>> root;
 
     private final int id;
+    /**
+     * 创建的版本号
+     */
     private final long createVersion;
+    /**
+     * key的数据类型
+     */
     private final DataType<K> keyType;
+    /**
+     * value的数据类型
+     */
     private final DataType<V> valueType;
     private final int keysPerPage;
     private final boolean singleWriter;
@@ -876,6 +885,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     boolean rollbackRoot(long version) {
         RootReference<K,V> rootReference = flushAndGetRoot();
         RootReference<K,V> previous;
+        //循环遍历找到对应的版本
         while (rootReference.version >= version && (previous = rootReference.previous) != null) {
             if (root.compareAndSet(rootReference, previous)) {
                 rootReference = previous;

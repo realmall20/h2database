@@ -42,6 +42,7 @@ import org.h2.mvstore.DataUtils;
  *
  * @author Thomas Mueller
  * @param <V> the value type
+ *           一种算法，解决LRU 算法的3个缺点，具体如何实现，如何解决需要再花时间看看。
  */
 public class CacheLongKeyLIRS<V> {
 

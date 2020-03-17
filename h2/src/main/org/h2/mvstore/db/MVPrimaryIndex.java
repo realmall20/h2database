@@ -34,7 +34,8 @@ import org.h2.value.ValueNull;
 import org.h2.value.VersionedValue;
 
 /**
- *  主键索引
+ *  主键索引，如果没有其它缩影，默认查找的数据从这里查找
+ *  当有where 语句的时候索引是怎么找的
  * A table stored in a MVStore.
  */
 public class MVPrimaryIndex extends BaseIndex implements MVIndex<Long,SearchRow> {

@@ -120,10 +120,13 @@ public class TestMVStore extends TestBase {
                 open()) {
             MVMap<String, String> map = store.openMap("test");
             map.put("1", "Hello");
+            //commit的时候是保存到文件？
             store.commit();
             store.removeMap(map);
+            //rollback 会持久化到文件中吗？
             store.rollback();
             assertTrue(store.hasMap("test"));
+            //openMap其实没什么影响？打开的还是原先的map。
             map = store.openMap("test");
             assertEquals("Hello", map.get("1"));
         }
@@ -149,7 +152,6 @@ public class TestMVStore extends TestBase {
     private void testProvidedFileStoreNotOpenedAndClosed() {
         final AtomicInteger openClose = new AtomicInteger();
         FileStore fileStore = new OffHeapStore() {
-
             @Override
             public void open(String fileName, boolean readOnly, char[] encryptionKey) {
                 openClose.incrementAndGet();
@@ -162,9 +164,7 @@ public class TestMVStore extends TestBase {
                 super.close();
             }
         };
-        MVStore store = new MVStore.Builder().
-                fileStore(fileStore).
-                open();
+        MVStore store = new MVStore.Builder().fileStore(fileStore).open();
         store.close();
         assertEquals(0, openClose.get());
     }

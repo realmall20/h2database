@@ -10,7 +10,7 @@ import java.util.NoSuchElementException;
 
 /**
  * A cursor to iterate over elements in ascending or descending order.
- *
+ * 游标，其实就是一个迭代器
  * @param <K> the key type
  * @param <V> the value type
  */

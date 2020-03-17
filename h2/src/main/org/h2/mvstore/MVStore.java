@@ -542,7 +542,7 @@ public class MVStore implements AutoCloseable {
      * Open a map with the given builder. The map is automatically create if it
      * does not yet exist. If a map with this name is already open, this map is
      * returned.
-     *
+     * 非线程安全。
      * @param <M>     the map type
      * @param <K>     the key type
      * @param <V>     the value type
@@ -2818,7 +2818,7 @@ public class MVStore implements AutoCloseable {
 
     /**
      * Remove a map from the current version of the store.
-     *
+     * 线程安全，是同一个线程里面的操作？
      * @param map the map to remove
      */
     public void removeMap(MVMap<?, ?> map) {
