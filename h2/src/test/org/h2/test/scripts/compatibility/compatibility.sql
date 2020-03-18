@@ -319,5 +319,173 @@ SELECT TABLE_NAME, TYPE_NAME, COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE 
 DROP TABLE TEST1, TEST2, TEST3, TEST4;
 > ok
 
+SET MODE PostgreSQL;
+> ok
+
+EXPLAIN VALUES VERSION();
+>> VALUES (VERSION())
+
 SET MODE Regular;
+> ok
+
+CREATE TABLE TEST(A INT) AS VALUES 0;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+> SIN(A) A + 1 A
+> ------ ----- -
+> 0.0    1     0
+> rows: 1
+
+CREATE VIEW V AS SELECT SIN(A), A+1, (((((A + 1) * A + 1) * A + 1) * A + 1) * A + 1) * A + 1 FROM TEST;
+> ok
+
+TABLE V;
+> SIN(A) A + 1 ((((((((((A + 1) * A) + 1) * A) + 1) * A) + 1) * A) + 1) * A) + 1
+> ------ ----- -----------------------------------------------------------------
+> 0.0    1     1
+> rows: 1
+
+DROP VIEW V;
+> ok
+
+CREATE VIEW V AS SELECT SIN(0), COS(0);
+> ok
+
+TABLE V;
+> 0.0 1.0
+> --- ---
+> 0.0 1.0
+> rows: 1
+
+DROP VIEW V;
+> ok
+
+SET MODE DB2;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+> 1   2 A
+> --- - -
+> 0.0 1 0
+> rows: 1
+
+CREATE VIEW V AS SELECT SIN(A), A+1, (((((A + 1) * A + 1) * A + 1) * A + 1) * A + 1) * A + 1 FROM TEST;
+> exception COLUMN_ALIAS_IS_NOT_SPECIFIED_1
+
+SET MODE Derby;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+> 1   2 A
+> --- - -
+> 0.0 1 0
+> rows: 1
+
+CREATE VIEW V AS SELECT SIN(A), A+1, (((((A + 1) * A + 1) * A + 1) * A + 1) * A + 1) * A + 1 FROM TEST;
+> exception COLUMN_ALIAS_IS_NOT_SPECIFIED_1
+
+SET MODE MSSQLServer;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+>       A
+> --- - -
+> 0.0 1 0
+> rows: 1
+
+CREATE VIEW V AS SELECT SIN(A), A+1, (((((A + 1) * A + 1) * A + 1) * A + 1) * A + 1) * A + 1 FROM TEST;
+> exception COLUMN_ALIAS_IS_NOT_SPECIFIED_1
+
+SET MODE HSQLDB;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+> C1  C2 A
+> --- -- -
+> 0.0 1  0
+> rows: 1
+
+CREATE VIEW V AS SELECT SIN(A), A+1, (((((A + 1) * A + 1) * A + 1) * A + 1) * A + 1) * A + 1 FROM TEST;
+> ok
+
+TABLE V;
+> C1  C2 C3
+> --- -- --
+> 0.0 1  1
+> rows: 1
+
+DROP VIEW V;
+> ok
+
+SET MODE MySQL;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+> SIN(A) A + 1 A
+> ------ ----- -
+> 0.0    1     0
+> rows: 1
+
+CREATE VIEW V AS SELECT SIN(A), A+1, (((((A + 1) * A + 1) * A + 1) * A + 1) * A + 1) * A + 1 FROM TEST;
+> ok
+
+TABLE V;
+> SIN(A) A + 1 Name_exp_3
+> ------ ----- ----------
+> 0.0    1     1
+> rows: 1
+
+DROP VIEW V;
+> ok
+
+CREATE VIEW V AS SELECT SIN(0), COS(0);
+> ok
+
+TABLE V;
+> SIN(0) COS(0)
+> ------ ------
+> 0.0    1.0
+> rows: 1
+
+DROP VIEW V;
+> ok
+
+SET MODE Oracle;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+> SIN(A) A + 1 A
+> ------ ----- -
+> 0.0    1     0
+> rows: 1
+
+SET MODE PostgreSQL;
+> ok
+
+SELECT SIN(A), A+1, A FROM TEST;
+> sin ?column? A
+> --- -------- -
+> 0.0 1        0
+> rows: 1
+
+CREATE VIEW V AS SELECT SIN(A), A+1, (((((A + 1) * A + 1) * A + 1) * A + 1) * A + 1) * A + 1 FROM TEST;
+> exception DUPLICATE_COLUMN_NAME_1
+
+CREATE VIEW V AS SELECT SIN(0), COS(0);
+> ok
+
+TABLE V;
+> sin cos
+> --- ---
+> 0.0 1.0
+> rows: 1
+
+DROP VIEW V;
+> ok
+
+SET MODE Regular;
+> ok
+
+DROP TABLE TEST;
 > ok

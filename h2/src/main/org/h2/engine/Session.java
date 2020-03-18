@@ -49,7 +49,6 @@ import org.h2.store.InDoubtTransaction;
 import org.h2.store.LobStorageFrontend;
 import org.h2.table.Table;
 import org.h2.table.TableType;
-import org.h2.util.ColumnNamerConfiguration;
 import org.h2.util.DateTimeUtils;
 import org.h2.util.HasSQL;
 import org.h2.util.NetworkConnectionInfo;
@@ -188,7 +187,6 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
     private HashMap<Object, ViewIndex> subQueryIndexCache;
     private boolean forceJoinOrder;
     private boolean lazyQueryExecution;
-    private ColumnNamerConfiguration columnNamerConfiguration;
 
     private BitSet nonKeywords;
 
@@ -256,7 +254,6 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
         Schema mainSchema = database.getMainSchema();
         this.currentSchemaName = mainSchema != null ? mainSchema.getName()
                 : database.sysIdentifier(Constants.SCHEMA_MAIN);
-        this.columnNamerConfiguration = ColumnNamerConfiguration.getDefault();
         timeZone = DateTimeUtils.getTimeZone();
         sessionStart = DateTimeUtils.currentTimestamp(timeZone);
     }
@@ -1032,6 +1029,13 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
             }
             locks.clear();
         }
+        if (!database.isMVStore() && database.getLockMode() == Constants.LOCK_MODE_READ_COMMITTED) {
+            // PageStoreTable.doLock2() doesn't register a table lock in this setup
+            // but waiting threads still need to be awoken from their sleep
+            synchronized (database) {
+                database.notifyAll();
+            }
+        }
         database.unlockMetaDebug(this);
         savepoints = null;
         sessionStateChanged = true;
@@ -1797,8 +1801,7 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
                     database.shutdownImmediately();
                     throw DbException.get(ErrorCode.DATABASE_IS_CLOSED, backgroundException);
                 }
-                transaction = store.getTransactionStore().begin(this, this.lockTimeout, id);
-                transaction.setIsolationLevel(isolationLevel);
+                transaction = store.getTransactionStore().begin(this, this.lockTimeout, id, isolationLevel);
             }
             startStatement = -1;
         }
@@ -2039,14 +2042,6 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
             this.value = v;
         }
 
-    }
-
-    public ColumnNamerConfiguration getColumnNamerConfiguration() {
-        return columnNamerConfiguration;
-    }
-
-    public void setColumnNamerConfiguration(ColumnNamerConfiguration columnNamerConfiguration) {
-        this.columnNamerConfiguration = columnNamerConfiguration;
     }
 
     @Override

@@ -30,6 +30,11 @@ import java.sql.Types;
 import java.text.DecimalFormatSymbols;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
+import java.time.temporal.TemporalQueries;
+import java.time.temporal.WeekFields;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -47,10 +52,10 @@ import org.h2.api.AggregateFunction;
 import org.h2.api.ErrorCode;
 import org.h2.engine.Constants;
 import org.h2.engine.Session;
-import org.h2.expression.function.ToDateParser;
 import org.h2.expression.function.ToChar.Capitalization;
 import org.h2.jdbc.JdbcConnection;
 import org.h2.message.DbException;
+import org.h2.mode.ToDateParser;
 import org.h2.store.fs.FileUtils;
 import org.h2.test.TestBase;
 import org.h2.test.TestDb;
@@ -113,6 +118,7 @@ public class TestFunctions extends TestDb implements AggregateFunction {
         testAggregate();
         testAggregateType();
         testFunctions();
+        testDateTimeFunctions();
         testFileRead();
         testValue();
         testNvl2();
@@ -1097,6 +1103,36 @@ public class TestFunctions extends TestDb implements AggregateFunction {
         assertEquals(null, rs.getString(1));
         assertFalse(rs.next());
 
+        conn.close();
+    }
+
+    private void testDateTimeFunctions() throws SQLException {
+        deleteDb("functions");
+        Connection conn = getConnection("functions");
+        Statement stat = conn.createStatement();
+        ResultSet rs;
+        WeekFields wf = WeekFields.of(Locale.getDefault());
+        for (int y = 2001; y <= 2010; y++) {
+            for (int d = 1; d <= 7; d++) {
+                String date1 = y + "-01-0" + d, date2 = y + "-01-0" + (d + 1);
+                LocalDate local1 = LocalDate.parse(date1), local2 = LocalDate.parse(date2);
+                rs = stat.executeQuery(
+                        "SELECT EXTRACT(DAY_OF_WEEK FROM C1), EXTRACT(WEEK FROM C1), EXTRACT(WEEK_YEAR FROM C1),"
+                                + " DATEDIFF(WEEK, C1, C2), DATE_TRUNC(WEEK, C1), DATE_TRUNC(WEEK_YEAR, C1) FROM"
+                                + " VALUES (DATE '" + date1 + "', DATE '" + date2 + "')");
+                rs.next();
+                assertEquals(local1.get(wf.dayOfWeek()), rs.getInt(1));
+                int w1 = local1.get(wf.weekOfWeekBasedYear());
+                assertEquals(w1, rs.getInt(2));
+                int weekYear = local1.get(wf.weekBasedYear());
+                assertEquals(weekYear, rs.getInt(3));
+                assertEquals(w1 == local2.get(wf.weekOfWeekBasedYear()) ? 0 : 1, rs.getInt(4));
+                assertEquals(local1.minus(local1.get(wf.dayOfWeek()) - 1, ChronoUnit.DAYS),
+                        rs.getObject(5, LocalDate.class));
+                assertEquals(DateTimeFormatter.ofPattern("Y-w-e").parse(weekYear + "-1-1")
+                        .query(TemporalQueries.localDate()), rs.getObject(6, LocalDate.class));
+            }
+        }
         conn.close();
     }
 

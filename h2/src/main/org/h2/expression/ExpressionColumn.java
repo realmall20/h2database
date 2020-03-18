@@ -241,7 +241,7 @@ public class ExpressionColumn extends Expression {
     }
 
     @Override
-    public String getColumnName() {
+    public String getColumnName(Session session, int columnIndex) {
         if (column != null) {
             if (columnResolver != null) {
                 return columnResolver.getColumnName(column);
@@ -264,7 +264,7 @@ public class ExpressionColumn extends Expression {
     }
 
     @Override
-    public String getAlias() {
+    public String getAlias(Session session, int columnIndex) {
         if (column != null) {
             if (columnResolver != null) {
                 return columnResolver.getColumnName(column);
@@ -275,6 +275,11 @@ public class ExpressionColumn extends Expression {
             return tableAlias + '.' + columnName;
         }
         return columnName;
+    }
+
+    @Override
+    public String getColumnNameForView(Session session, int columnIndex) {
+        return getAlias(session, columnIndex);
     }
 
     @Override

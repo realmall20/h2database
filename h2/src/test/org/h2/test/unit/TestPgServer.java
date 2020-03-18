@@ -61,46 +61,12 @@ public class TestPgServer extends TestDb {
     public void test() throws Exception {
         // testPgAdapter() starts server by itself without a wait so run it first
         testPgAdapter();
-        testLowerCaseIdentifiers();
         testKeyAlias();
         testCancelQuery();
         testTextualAndBinaryTypes();
         testDateTime();
         testPrepareWithUnspecifiedType();
         testOtherPgClients();
-    }
-
-    private void testLowerCaseIdentifiers() throws SQLException {
-        if (!getPgJdbcDriver()) {
-            return;
-        }
-        deleteDb("pgserver");
-        Connection conn = getConnection(
-                "mem:pgserver;DATABASE_TO_LOWER=true", "sa", "sa");
-        Statement stat = conn.createStatement();
-        stat.execute("create table test(id int, name varchar(255))");
-        Server server = createPgServer("-baseDir", getBaseDir(),
-                "-ifNotExists", "-pgPort", "5535", "-pgDaemon", "-key", "pgserver",
-                "mem:pgserver");
-        try {
-            Connection conn2;
-            conn2 = DriverManager.getConnection(
-                    "jdbc:postgresql://localhost:5535/pgserver", "sa", "sa");
-            stat = conn2.createStatement();
-            stat.execute("select * from test");
-
-            // test pg_get_oid
-            try (ResultSet rs = stat.executeQuery("select 0::regclass")) {
-                assertTrue(rs.next());
-                assertEquals(0, rs.getInt(1));
-            }
-
-            conn2.close();
-        } finally {
-            server.stop();
-        }
-        conn.close();
-        deleteDb("pgserver");
     }
 
     private boolean getPgJdbcDriver() {
@@ -256,13 +222,13 @@ public class TestPgServer extends TestDb {
         DatabaseMetaData dbMeta = conn.getMetaData();
         rs = dbMeta.getTables(null, null, "TEST", null);
         rs.next();
-        assertEquals("TEST", rs.getString("TABLE_NAME"));
+        assertEquals("test", rs.getString("TABLE_NAME"));
         assertFalse(rs.next());
         rs = dbMeta.getColumns(null, null, "TEST", null);
         rs.next();
-        assertEquals("ID", rs.getString("COLUMN_NAME"));
+        assertEquals("id", rs.getString("COLUMN_NAME"));
         rs.next();
-        assertEquals("NAME", rs.getString("COLUMN_NAME"));
+        assertEquals("name", rs.getString("COLUMN_NAME"));
         assertFalse(rs.next());
         rs = dbMeta.getIndexInfo(null, null, "TEST", false, false);
         // index info is currently disabled
@@ -279,7 +245,7 @@ public class TestPgServer extends TestDb {
         assertContains(s, "PostgreSQL");
         s = rs.getString(2);
         s = rs.getString(3);
-        assertEquals(s, "PUBLIC");
+        assertEquals(s, "public");
         assertFalse(rs.next());
 
         conn.setAutoCommit(false);
@@ -308,14 +274,18 @@ public class TestPgServer extends TestDb {
         rs.next();
         assertTrue(rs.getBoolean(1));
 
+        rs = stat.executeQuery("select has_schema_privilege(1, 'READ')");
+        rs.next();
+        assertTrue(rs.getBoolean(1));
+
         rs = stat.executeQuery("select has_database_privilege(1, 'READ')");
         rs.next();
         assertTrue(rs.getBoolean(1));
 
 
-        rs = stat.executeQuery("select pg_get_userbyid(-1)");
+        rs = stat.executeQuery("select pg_get_userbyid(1000000000)");
         rs.next();
-        assertEquals(null, rs.getString(1));
+        assertEquals("unknown (OID=1000000000)", rs.getString(1));
 
         rs = stat.executeQuery("select pg_encoding_to_char(0)");
         rs.next();
@@ -337,48 +307,33 @@ public class TestPgServer extends TestDb {
         rs.next();
         assertEquals("", rs.getString(1));
 
-        rs = stat.executeQuery("select pg_get_oid('\"WRONG\"')");
-        rs.next();
-        assertEquals(0, rs.getInt(1));
-
-        rs = stat.executeQuery("select pg_get_oid('TEST')");
-        rs.next();
-        assertTrue(rs.getInt(1) > 0);
-
-        rs = stat.executeQuery("select pg_get_oid('\"WRONG\"')");
-        rs.next();
-        assertEquals(0, rs.getInt(1));
-
-        // regclass cast will call pg_get_oid()
         rs = stat.executeQuery("select 0::regclass");
         rs.next();
         assertEquals(0, rs.getInt(1));
 
         rs = stat.executeQuery("select pg_get_indexdef(0, 0, false)");
         rs.next();
-        assertEquals("", rs.getString(1));
+        assertNull(rs.getString(1));
 
         rs = stat.executeQuery("select id from information_schema.indexes " +
-                "where index_name='IDX_TEST_NAME'");
+                "where index_name='idx_test_name'");
         rs.next();
         int indexId = rs.getInt(1);
 
         rs = stat.executeQuery("select pg_get_indexdef("+indexId+", 0, false)");
         rs.next();
         assertEquals(
-                "CREATE INDEX \"PUBLIC\".\"IDX_TEST_NAME\" ON \"PUBLIC\".\"TEST\"(\"NAME\", \"ID\")",
+                "CREATE INDEX \"public\".\"idx_test_name\" ON \"public\".\"test\"(\"name\", \"id\")",
                 rs.getString(1));
         rs = stat.executeQuery("select pg_get_indexdef("+indexId+", null, false)");
         rs.next();
-        assertEquals(
-                "CREATE INDEX \"PUBLIC\".\"IDX_TEST_NAME\" ON \"PUBLIC\".\"TEST\"(\"NAME\", \"ID\")",
-                rs.getString(1));
+        assertNull(rs.getString(1));
         rs = stat.executeQuery("select pg_get_indexdef("+indexId+", 1, false)");
         rs.next();
-        assertEquals("NAME", rs.getString(1));
+        assertEquals("name", rs.getString(1));
         rs = stat.executeQuery("select pg_get_indexdef("+indexId+", 2, false)");
         rs.next();
-        assertEquals("ID", rs.getString(1));
+        assertEquals("id", rs.getString(1));
 
         conn.close();
     }
@@ -399,7 +354,7 @@ public class TestPgServer extends TestDb {
             stat.execute("create table test(id int primary key, name varchar)");
             ResultSet rs = stat.executeQuery(
                     "select storage_type from information_schema.tables " +
-                    "where table_name = 'TEST'");
+                    "where table_name = 'test'");
             assertTrue(rs.next());
             assertEquals("MEMORY", rs.getString(1));
 
@@ -640,6 +595,57 @@ public class TestPgServer extends TestDb {
                 assertFalse(rs.next());
             }
             stat.execute("SET client_encoding='UNICODE'");
+            try (ResultSet rs = stat.executeQuery("SELECT version()")) {
+                assertTrue(rs.next());
+                assertNotNull(rs.getString("version"));
+            }
+            try (ResultSet rs = stat.executeQuery("SELECT " +
+                    "db.oid as did, db.datname, db.datallowconn, " +
+                    "pg_encoding_to_char(db.encoding) AS serverencoding, " +
+                    "has_database_privilege(db.oid, 'CREATE') as cancreate, datlastsysoid " +
+                    "FROM pg_database db WHERE db.datname = current_database()")) {
+                assertTrue(rs.next());
+                assertEquals("pgserver", rs.getString("datname"));
+                assertFalse(rs.next());
+            }
+            try (ResultSet rs = stat.executeQuery("SELECT " +
+                    "oid as id, rolname as name, rolsuper as is_superuser, " +
+                    "CASE WHEN rolsuper THEN true ELSE rolcreaterole END as can_create_role, " +
+                    "CASE WHEN rolsuper THEN true ELSE rolcreatedb END as can_create_db " +
+                    "FROM pg_catalog.pg_roles WHERE rolname = current_user")) {
+                assertTrue(rs.next());
+                assertEquals("sa", rs.getString("name"));
+                assertFalse(rs.next());
+            }
+            try (ResultSet rs = stat.executeQuery("SELECT " +
+                    "db.oid as did, db.datname as name, ta.spcname as spcname, db.datallowconn, " +
+                    "has_database_privilege(db.oid, 'CREATE') as cancreate, datdba as owner " +
+                    "FROM pg_database db LEFT OUTER JOIN pg_tablespace ta ON db.dattablespace = ta.oid " +
+                    "WHERE db.oid > 100000::OID")) {
+                assertTrue(rs.next());
+                assertEquals("pgserver", rs.getString("name"));
+                assertFalse(rs.next());
+            }
+            try (ResultSet rs = stat.executeQuery("SELECT nsp.oid, nsp.nspname as name, " +
+                    "has_schema_privilege(nsp.oid, 'CREATE') as can_create, " +
+                    "has_schema_privilege(nsp.oid, 'USAGE') as has_usage " +
+                    "FROM pg_namespace nsp WHERE nspname NOT LIKE 'pg\\_%' AND NOT (" +
+                    "(nsp.nspname = 'pg_catalog' AND EXISTS (SELECT 1 FROM pg_class " +
+                    "WHERE relname = 'pg_class' AND relnamespace = nsp.oid LIMIT 1)) OR " +
+                    "(nsp.nspname = 'pgagent' AND EXISTS (SELECT 1 FROM pg_class " +
+                    "WHERE relname = 'pga_job' AND relnamespace = nsp.oid LIMIT 1)) OR " +
+                    "(nsp.nspname = 'information_schema' AND EXISTS (SELECT 1 FROM pg_class " +
+                    "WHERE relname = 'tables' AND relnamespace = nsp.oid LIMIT 1))" +
+                    ") ORDER BY nspname")) {
+                assertTrue(rs.next());
+                assertEquals("public", rs.getString("name"));
+                assertFalse(rs.next());
+            }
+            try (ResultSet rs = stat.executeQuery("SELECT format_type(23, NULL)")) {
+                assertTrue(rs.next());
+                assertEquals("INTEGER", rs.getString(1));
+                assertFalse(rs.next());
+            }
 
             // HeidiSQL
             try (ResultSet rs = stat.executeQuery("SHOW ssl")) {
@@ -657,8 +663,8 @@ public class TestPgServer extends TestDb {
                     "WHERE t.\"table_schema\"='public'")) {
                 assertTrue(rs.next());
                 assertEquals("test", rs.getString("table_name"));
-                assertEquals(0, rs.getInt("index_length")); // test pg_relation_size()
-                assertEquals("", rs.getString("comment")); // test obj_description()
+                assertTrue(rs.getLong("index_length") >= 0L); // test pg_relation_size()
+                assertNull(rs.getString("comment")); // test obj_description()
             }
             try (ResultSet rs = stat.executeQuery("SELECT \"p\".\"proname\", \"p\".\"proargtypes\" " +
                     "FROM \"pg_catalog\".\"pg_namespace\" AS \"n\" " +
