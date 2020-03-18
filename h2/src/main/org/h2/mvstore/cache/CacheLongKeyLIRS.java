@@ -48,11 +48,16 @@ public class CacheLongKeyLIRS<V> {
 
     /**
      * The maximum memory this cache should use.
+     * 最大使用缓存
      */
     private long maxMemory;
-
+    /**
+     * 片段数组
+     */
     private final Segment<V>[] segments;
-
+    /**
+     * 片段数
+     */
     private final int segmentCount;
     private final int segmentShift;
     private final int segmentMask;
@@ -142,6 +147,7 @@ public class CacheLongKeyLIRS<V> {
     }
 
     /**
+     *
      * Add an entry to the cache. The entry may or may not exist in the
      * cache yet. This method will usually mark unknown entries as cold and
      * known entries as hot.
@@ -209,7 +215,9 @@ public class CacheLongKeyLIRS<V> {
         // check whether resize is required: synchronize on s, to avoid
         // concurrent resizes (concurrent reads read
         // from the old segment)
+        // 片段锁
         synchronized (s) {
+            //重新计算
             s = resizeIfNeeded(s, segmentIndex);
             return s.remove(key, hash);
         }
@@ -507,13 +515,14 @@ public class CacheLongKeyLIRS<V> {
 
     /**
      * A cache segment
-     *
+     * 缓存片段，LIRS 的核心实现
      * @param <V> the value type
      */
     private static class Segment<V> {
 
         /**
          * The number of (hot, cold, and non-resident) entries in the map.
+         * 所有数据的长度
          */
         int mapSize;
 
@@ -544,6 +553,7 @@ public class CacheLongKeyLIRS<V> {
 
         /**
          * The currently used memory.
+         * 当前使用的内存数
          */
         long usedMemory;
 
@@ -555,6 +565,7 @@ public class CacheLongKeyLIRS<V> {
 
         /**
          * The maximum memory this cache should use in bytes.
+         * 最大使用内存
          */
         private long maxMemory;
 
@@ -1042,6 +1053,7 @@ public class CacheLongKeyLIRS<V> {
         synchronized List<Long> keys(boolean cold, boolean nonResident) {
             ArrayList<Long> keys = new ArrayList<>();
             if (cold) {
+                //获取所有冷数据
                 Entry<V> start = nonResident ? queue2 : queue;
                 for (Entry<V> e = start.queueNext; e != start;
                         e = e.queueNext) {

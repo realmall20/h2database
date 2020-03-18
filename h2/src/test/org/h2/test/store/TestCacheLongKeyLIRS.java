@@ -345,6 +345,9 @@ public class TestCacheLongKeyLIRS extends TestBase {
                 "cold: 19 non-resident: 18 17 16 15 14 13 12 11 10 9 8 7 6 5 4 0");
     }
 
+    /**
+     * 测试有限制的内存
+     */
     private void testLimitMemory() {
         CacheLongKeyLIRS<Integer> test = createCache(4);
         for (int i = 0; i < 5; i++) {
@@ -363,6 +366,9 @@ public class TestCacheLongKeyLIRS extends TestBase {
         assertTrue("" + test.getUsedMemory(), test.getUsedMemory() <= 4);
     }
 
+    /**
+     * 数据扫描
+     */
     private void testScanResistance() {
         boolean log = false;
         int size = 20;
@@ -489,7 +495,9 @@ public class TestCacheLongKeyLIRS extends TestBase {
             mem += cache.getMemory(k);
         }
         assertEquals(mem, cache.getUsedMemory());
+        //所有的key 数据
         List<Long> stack = cache.keys(false, false);
+        //所有的冷 key 数据
         List<Long> cold = cache.keys(true, false);
         List<Long> nonResident = cache.keys(true, true);
         assertEquals(nonResident.size(), cache.sizeNonResident());
@@ -504,6 +512,12 @@ public class TestCacheLongKeyLIRS extends TestBase {
         }
     }
 
+    /**
+     * 设置一个片段，一个内存
+     * @param maxSize
+     * @param <V>
+     * @return
+     */
     private static <V> CacheLongKeyLIRS<V> createCache(int maxSize) {
         CacheLongKeyLIRS.Config cc = new CacheLongKeyLIRS.Config();
         cc.maxMemory = maxSize;
