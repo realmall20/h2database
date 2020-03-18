@@ -17,6 +17,7 @@ import org.h2.api.Trigger;
 import org.h2.command.Parser;
 import org.h2.engine.Constants;
 import org.h2.engine.Database;
+import org.h2.engine.Mode.ExpressionNames;
 import org.h2.engine.Session;
 import org.h2.expression.Alias;
 import org.h2.expression.Expression;
@@ -50,7 +51,6 @@ import org.h2.table.Table;
 import org.h2.table.TableFilter;
 import org.h2.table.TableType;
 import org.h2.table.TableView;
-import org.h2.util.ColumnNamer;
 import org.h2.util.HasSQL;
 import org.h2.util.StringUtils;
 import org.h2.util.Utils;
@@ -1060,12 +1060,12 @@ public class Select extends Query {
                     // special case: GROUP BY a column alias
                     for (int j = 0; j < expSize; j++) {
                         Expression e = expressions.get(j);
-                        if (db.equalsIdentifiers(sql, e.getAlias())) {
+                        if (db.equalsIdentifiers(sql, e.getAlias(session, j))) {
                             found = mergeGroupByExpressions(db, j, expressionSQL, true);
                             break;
                         }
-                        sql = expr.getAlias();
-                        if (db.equalsIdentifiers(sql, e.getAlias())) {
+                        sql = expr.getAlias(session, j);
+                        if (db.equalsIdentifiers(sql, e.getAlias(session, j))) {
                             found = mergeGroupByExpressions(db, j, expressionSQL, true);
                             break;
                         }
@@ -1166,16 +1166,13 @@ public class Select extends Query {
         if (orderList != null) {
             prepareOrder(orderList, expressions.size());
         }
-        ColumnNamer columnNamer = new ColumnNamer(session);
-        for (int i = 0; i < expressions.size(); i++) {
-            Expression e = expressions.get(i);
-            String proposedColumnName = e.getAlias();
-            String columnName = columnNamer.getColumnName(e, i, proposedColumnName);
-            // if the name changed, create an alias
-            if (!columnName.equals(proposedColumnName)) {
-                e = new Alias(e, columnName, true);
+        ExpressionNames expressionNames = session.getMode().expressionNames;
+        if (expressionNames == ExpressionNames.ORIGINAL_SQL || expressionNames == ExpressionNames.POSTGRESQL_STYLE) {
+            optimizeExpressionsAndPreserveAliases();
+        } else {
+            for (int i = 0; i < expressions.size(); i++) {
+                expressions.set(i, expressions.get(i).optimize(session));
             }
-            expressions.set(i, e.optimize(session));
         }
         if (sort != null) {
             cleanupOrder();
@@ -1282,6 +1279,18 @@ public class Select extends Query {
         }
         expressionArray = expressions.toArray(new Expression[0]);
         isPrepared = true;
+    }
+
+    private void optimizeExpressionsAndPreserveAliases() {
+        for (int i = 0; i < expressions.size(); i++) {
+            Expression e = expressions.get(i);
+            String alias = e.getAlias(session, i);
+            e = e.optimize(session);
+            if (!e.getAlias(session, i).equals(alias)) {
+                e = new Alias(e, alias, true);
+            }
+            expressions.set(i, e);
+        }
     }
 
     @Override
@@ -1791,7 +1800,7 @@ public class Select extends Query {
         int columnCount;
 
         LazyResultSelect(Expression[] expressions, int columnCount) {
-            super(expressions);
+            super(getSession(), expressions);
             this.columnCount = columnCount;
             setCurrentRowNumber(0);
         }

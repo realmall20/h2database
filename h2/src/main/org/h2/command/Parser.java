@@ -9,8 +9,10 @@
 package org.h2.command;
 
 import static org.h2.util.ParserUtil.ALL;
+import static org.h2.util.ParserUtil.AND;
 import static org.h2.util.ParserUtil.ARRAY;
 import static org.h2.util.ParserUtil.AS;
+import static org.h2.util.ParserUtil.BETWEEN;
 import static org.h2.util.ParserUtil.CASE;
 import static org.h2.util.ParserUtil.CHECK;
 import static org.h2.util.ParserUtil.CONSTRAINT;
@@ -37,6 +39,7 @@ import static org.h2.util.ParserUtil.HAVING;
 import static org.h2.util.ParserUtil.HOUR;
 import static org.h2.util.ParserUtil.IDENTIFIER;
 import static org.h2.util.ParserUtil.IF;
+import static org.h2.util.ParserUtil.IN;
 import static org.h2.util.ParserUtil.INNER;
 import static org.h2.util.ParserUtil.INTERSECT;
 import static org.h2.util.ParserUtil.INTERSECTS;
@@ -58,6 +61,7 @@ import static org.h2.util.ParserUtil.NOT;
 import static org.h2.util.ParserUtil.NULL;
 import static org.h2.util.ParserUtil.OFFSET;
 import static org.h2.util.ParserUtil.ON;
+import static org.h2.util.ParserUtil.OR;
 import static org.h2.util.ParserUtil.ORDER;
 import static org.h2.util.ParserUtil.PRIMARY;
 import static org.h2.util.ParserUtil.QUALIFY;
@@ -226,6 +230,7 @@ import org.h2.expression.analysis.WindowFunction;
 import org.h2.expression.analysis.WindowFunctionType;
 import org.h2.expression.condition.BooleanTest;
 import org.h2.expression.condition.CompareLike;
+import org.h2.expression.condition.CompareLike.LikeType;
 import org.h2.expression.condition.Comparison;
 import org.h2.expression.condition.ConditionAndOr;
 import org.h2.expression.condition.ConditionIn;
@@ -238,12 +243,15 @@ import org.h2.expression.condition.IsJsonPredicate;
 import org.h2.expression.condition.NullPredicate;
 import org.h2.expression.condition.TypePredicate;
 import org.h2.expression.condition.UniquePredicate;
+import org.h2.expression.function.DateTimeFunctions;
 import org.h2.expression.function.Function;
 import org.h2.expression.function.FunctionCall;
 import org.h2.expression.function.JavaFunction;
 import org.h2.expression.function.TableFunction;
 import org.h2.index.Index;
 import org.h2.message.DbException;
+import org.h2.mode.FunctionsPostgreSQL;
+import org.h2.mode.Regclass;
 import org.h2.result.SortOrder;
 import org.h2.schema.Domain;
 import org.h2.schema.Schema;
@@ -475,10 +483,14 @@ public class Parser {
             null,
             // ALL
             "ALL",
+            // AND
+            "AND",
             // ARRAY
             "ARRAY",
             // AS
             "AS",
+            // BETWEEN
+            "BETWEEN",
             // CASE
             "CASE",
             // CHECK
@@ -527,6 +539,8 @@ public class Parser {
             "HOUR",
             // IF
             "IF",
+            // IN
+            "IN",
             // INNER
             "INNER",
             // INTERSECT
@@ -567,6 +581,8 @@ public class Parser {
             "OFFSET",
             // ON
             "ON",
+            // OR
+            "OR",
             // ORDER
             "ORDER",
             // PRIMARY
@@ -1540,7 +1556,7 @@ public class Parser {
             String s = currentToken;
             read();
             CompareLike like = new CompareLike(database, function,
-                    ValueExpression.get(ValueVarchar.get('%' + s + '%')), null, false);
+                    ValueExpression.get(ValueVarchar.get('%' + s + '%')), null, LikeType.LIKE);
             select.addCondition(like);
         }
         select.init();
@@ -1751,7 +1767,7 @@ public class Parser {
     }
 
     private void parseWhenMatched(MergeUsing command) {
-        Expression and = readIf("AND") ? readExpression() : null;
+        Expression and = readIf(AND) ? readExpression() : null;
         read("THEN");
         int startMatched = lastParseIndex;
         Update updateCommand = null;
@@ -1785,7 +1801,7 @@ public class Parser {
     private void parseWhenNotMatched(MergeUsing command) {
         read(NOT);
         read("MATCHED");
-        Expression and = readIf("AND") ? readExpression() : null;
+        Expression and = readIf(AND) ? readExpression() : null;
         read("THEN");
         read("INSERT");
         Insert insertCommand = new Insert(session);
@@ -2855,7 +2871,7 @@ public class Parser {
             if (readIf("RR") || readIf("RS")) {
                 // concurrent-access-resolution clause
                 if (readIf("USE")) {
-                    read("AND");
+                    read(AND);
                     read("KEEP");
                     if (readIf("SHARE") || readIf("UPDATE") ||
                             readIf("EXCLUSIVE")) {
@@ -3161,12 +3177,12 @@ public class Parser {
 
     private Expression readExpressionWithGlobalConditions() {
         Expression r = readCondition();
-        if (readIf("AND")) {
+        if (readIf(AND)) {
             r = readAnd(new ConditionAndOr(ConditionAndOr.AND, r, readCondition()));
         } else if (readIf("_LOCAL_AND_GLOBAL_")) {
             r = readAnd(new ConditionLocalAndGlobal(r, readCondition()));
         }
-        while (readIf("OR")) {
+        while (readIf(OR)) {
             r = new ConditionAndOr(ConditionAndOr.OR, r, readAnd(readCondition()));
         }
         return r;
@@ -3174,14 +3190,14 @@ public class Parser {
 
     private Expression readExpression() {
         Expression r = readAnd(readCondition());
-        while (readIf("OR")) {
+        while (readIf(OR)) {
             r = new ConditionAndOr(ConditionAndOr.OR, r, readAnd(readCondition()));
         }
         return r;
     }
 
     private Expression readAnd(Expression r) {
-        while (readIf("AND")) {
+        while (readIf(AND)) {
             r = new ConditionAndOr(ConditionAndOr.AND, r, readCondition());
         }
         return r;
@@ -3223,7 +3239,7 @@ public class Parser {
             }
         }
         Expression r = readConcat();
-        while (true) {
+        loop: for (;;) {
             // special case: NOT NULL is not part of an expression (as in CREATE
             // TABLE TEST(ID INT DEFAULT 0 NOT NULL))
             int backup = parseIndex;
@@ -3235,120 +3251,48 @@ public class Parser {
                 currentTokenType = NOT;
                 break;
             }
-            if (readIf(LIKE)) {
-                Expression b = readConcat();
-                Expression esc = null;
-                if (readIf("ESCAPE")) {
-                    esc = readConcat();
-                }
-                recompileAlways = true;
-                r = new CompareLike(database, r, b, esc, false);
-            } else if (readIf("ILIKE")) {
-                Function function = Function.getFunctionWithArgs(database, Function.CAST, r);
-                function.setDataType(TypeInfo.TYPE_VARCHAR_IGNORECASE);
-                r = function;
-                Expression b = readConcat();
-                Expression esc = null;
-                if (readIf("ESCAPE")) {
-                    esc = readConcat();
-                }
-                recompileAlways = true;
-                r = new CompareLike(database, r, b, esc, false);
-            } else if (readIf("REGEXP")) {
-                Expression b = readConcat();
-                recompileAlways = true;
-                r = new CompareLike(database, r, b, null, true);
-            } else if (readIf(IS)) {
-                boolean isNot = readIf(NOT);
-                switch (currentTokenType) {
-                case NULL:
-                    read();
-                    r = new NullPredicate(r, isNot);
-                    break;
-                case DISTINCT:
-                    read();
-                    read(FROM);
-                    r = new Comparison(isNot ? Comparison.EQUAL_NULL_SAFE : Comparison.NOT_EQUAL_NULL_SAFE, r,
-                            readConcat());
-                    break;
-                case TRUE:
-                    read();
-                    r = new BooleanTest(r, isNot, true);
-                    break;
-                case FALSE:
-                    read();
-                    r = new BooleanTest(r, isNot, false);
-                    break;
-                case UNKNOWN:
-                    read();
-                    r = new BooleanTest(r, isNot, null);
-                    break;
-                default:
-                    if (readIf("OF")) {
-                        r = readTypePredicate(r, isNot);
-                    } else if (readIf("JSON")) {
-                        r = readJsonPredicate(r, isNot);
-                    } else {
-                        if (expectedList != null) {
-                            addMultipleExpected(NULL, DISTINCT, TRUE, FALSE, UNKNOWN);
-                        }
-                        /*
-                         * Databases that were created in 1.4.199 and older
-                         * versions can contain invalid generated IS [ NOT ]
-                         * expressions.
-                         */
-                        if (!database.isStarting()) {
-                            throw getSyntaxError();
-                        }
-                        r = new Comparison(
-                                isNot ? Comparison.NOT_EQUAL_NULL_SAFE : Comparison.EQUAL_NULL_SAFE, r, readConcat());
-                    }
-                }
-            } else if (readIf("IN")) {
-                r = readInPredicate(r);
-            } else if (readIf("BETWEEN")) {
+            switch (currentTokenType) {
+            case BETWEEN: {
+                read();
                 Expression low = readConcat();
-                read("AND");
+                read(AND);
                 Expression high = readConcat();
                 Expression condLow = new Comparison(Comparison.SMALLER_EQUAL, low, r);
                 Expression condHigh = new Comparison(Comparison.BIGGER_EQUAL, high, r);
                 r = new ConditionAndOr(ConditionAndOr.AND, condLow, condHigh);
-            } else {
-                if (not) {
-                    throw getSyntaxError();
-                }
-                int compareType = getCompareType(currentTokenType);
-                if (compareType < 0) {
-                    break;
-                }
+                break;
+            }
+            case IN:
                 read();
-                int start = lastParseIndex;
-                if (readIf(ALL)) {
-                    read(OPEN_PAREN);
-                    if (isQuery()) {
-                        Query query = parseQuery();
-                        r = new ConditionInQuery(r, query, true, compareType);
-                        read(CLOSE_PAREN);
-                    } else {
-                        reread(start);
-                        r = new Comparison(compareType, r, readConcat());
+                r = readInPredicate(r);
+                break;
+            case IS:
+                read();
+                r = readConditionIs(r);
+                break;
+            case LIKE: {
+                read();
+                r = readLikePredicate(r, LikeType.LIKE);
+                break;
+            }
+            default:
+                if (readIf("ILIKE")) {
+                    r = readLikePredicate(r, LikeType.ILIKE);
+                } else if (readIf("REGEXP")) {
+                    Expression b = readConcat();
+                    recompileAlways = true;
+                    r = new CompareLike(database, r, b, null, LikeType.REGEXP);
+                } else if (not) {
+                    if (expectedList != null) {
+                        addMultipleExpected(LIKE, IS, IN, BETWEEN);
                     }
-                } else if (readIf("ANY") || readIf("SOME")) {
-                    read(OPEN_PAREN);
-                    if (currentTokenType == PARAMETER && compareType == 0) {
-                        Parameter p = readParameter();
-                        r = new ConditionInParameter(r, p);
-                        read(CLOSE_PAREN);
-                    } else if (isQuery()) {
-                        Query query = parseQuery();
-                        r = new ConditionInQuery(r, query, false, compareType);
-                        read(CLOSE_PAREN);
-                    } else {
-                        reread(start);
-                        r = new Comparison(compareType, r, readConcat());
-                    }
+                    throw getSyntaxError();
                 } else {
-                    r = new Comparison(compareType, r, readConcat());
+                    int compareType = getCompareType(currentTokenType);
+                    if (compareType < 0) {
+                        break loop;
+                    }
+                    r = readComparison(r, compareType);
                 }
             }
             if (not) {
@@ -3356,6 +3300,55 @@ public class Parser {
             }
         }
         return r;
+    }
+
+    private Expression readConditionIs(Expression left) {
+        boolean isNot = readIf(NOT);
+        switch (currentTokenType) {
+        case NULL:
+            read();
+            left = new NullPredicate(left, isNot);
+            break;
+        case DISTINCT:
+            read();
+            read(FROM);
+            left = new Comparison(isNot ? Comparison.EQUAL_NULL_SAFE : Comparison.NOT_EQUAL_NULL_SAFE, left,
+                    readConcat());
+            break;
+        case TRUE:
+            read();
+            left = new BooleanTest(left, isNot, true);
+            break;
+        case FALSE:
+            read();
+            left = new BooleanTest(left, isNot, false);
+            break;
+        case UNKNOWN:
+            read();
+            left = new BooleanTest(left, isNot, null);
+            break;
+        default:
+            if (readIf("OF")) {
+                left = readTypePredicate(left, isNot);
+            } else if (readIf("JSON")) {
+                left = readJsonPredicate(left, isNot);
+            } else {
+                if (expectedList != null) {
+                    addMultipleExpected(NULL, DISTINCT, TRUE, FALSE, UNKNOWN);
+                }
+                /*
+                 * Databases that were created in 1.4.199 and older
+                 * versions can contain invalid generated IS [ NOT ]
+                 * expressions.
+                 */
+                if (!database.isStarting()) {
+                    throw getSyntaxError();
+                }
+                left = new Comparison(
+                        isNot ? Comparison.NOT_EQUAL_NULL_SAFE : Comparison.EQUAL_NULL_SAFE, left, readConcat());
+            }
+        }
+        return left;
     }
 
     private TypePredicate readTypePredicate(Expression left, boolean not) {
@@ -3414,26 +3407,63 @@ public class Parser {
         return new IsJsonPredicate(left, not, unique, itemType);
     }
 
+    private Expression readLikePredicate(Expression left, LikeType likeType) {
+        Expression right = readConcat();
+        Expression esc = readIf("ESCAPE") ? readConcat() : null;
+        recompileAlways = true;
+        return new CompareLike(database, left, right, esc, likeType);
+    }
+
+    private Expression readComparison(Expression left, int compareType) {
+        read();
+        int start = lastParseIndex;
+        if (readIf(ALL)) {
+            read(OPEN_PAREN);
+            if (isQuery()) {
+                Query query = parseQuery();
+                left = new ConditionInQuery(left, query, true, compareType);
+                read(CLOSE_PAREN);
+            } else {
+                reread(start);
+                left = new Comparison(compareType, left, readConcat());
+            }
+        } else if (readIf("ANY") || readIf("SOME")) {
+            read(OPEN_PAREN);
+            if (currentTokenType == PARAMETER && compareType == 0) {
+                Parameter p = readParameter();
+                left = new ConditionInParameter(left, p);
+                read(CLOSE_PAREN);
+            } else if (isQuery()) {
+                Query query = parseQuery();
+                left = new ConditionInQuery(left, query, false, compareType);
+                read(CLOSE_PAREN);
+            } else {
+                reread(start);
+                left = new Comparison(compareType, left, readConcat());
+            }
+        } else {
+            left = new Comparison(compareType, left, readConcat());
+        }
+        return left;
+    }
+
     private Expression readConcat() {
         Expression r = readSum();
-        while (true) {
-            if (readIf(CONCATENATION)) {
+        for (;;) {
+            switch (currentTokenType) {
+            case CONCATENATION:
+                read();
                 r = new ConcatenationOperation(r, readSum());
-            } else if (readIf(TILDE)) {
-                if (readIf(ASTERISK)) {
-                    Function function = Function.getFunctionWithArgs(database, Function.CAST, r);
-                    function.setDataType(TypeInfo.TYPE_VARCHAR_IGNORECASE);
-                    r = function;
-                }
-                r = new CompareLike(database, r, readSum(), null, true);
-            } else if (readIf(NOT_TILDE)) {
-                if (readIf(ASTERISK)) {
-                    Function function = Function.getFunctionWithArgs(database, Function.CAST, r);
-                    function.setDataType(TypeInfo.TYPE_VARCHAR_IGNORECASE);
-                    r = function;
-                }
-                r = new ConditionNot(new CompareLike(database, r, readSum(), null, true));
-            } else {
+                break;
+            case TILDE: // PostgreSQL compatibility
+                r = readTildeCondition(r);
+                break;
+            case NOT_TILDE: // PostgreSQL compatibility
+                r = new ConditionNot(readTildeCondition(r));
+                break;
+            default:
+                // Don't add compatibility operators
+                addExpected(CONCATENATION);
                 return r;
             }
         }
@@ -3465,6 +3495,16 @@ public class Parser {
                 return r;
             }
         }
+    }
+
+    private Expression readTildeCondition(Expression r) {
+        read();
+        if (readIf(ASTERISK)) {
+            Function function = Function.getFunctionWithArgs(database, Function.CAST, r);
+            function.setDataType(TypeInfo.TYPE_VARCHAR_IGNORECASE);
+            r = function;
+        }
+        return new CompareLike(database, r, readSum(), null, LikeType.REGEXP);
     }
 
     private Expression readAggregate(AggregateType aggregateType, String aggregateName) {
@@ -3777,9 +3817,9 @@ public class Parser {
             return null;
         }
         WindowFrameBound starting, following;
-        if (readIf("BETWEEN")) {
+        if (readIf(BETWEEN)) {
             starting = readWindowFrameRange();
-            read("AND");
+            read(AND);
             following = readWindowFrameRange();
         } else {
             starting = readWindowFrameStarting();
@@ -3851,7 +3891,7 @@ public class Parser {
 
     private Expression readFunction(Schema schema, String name) {
         if (schema != null) {
-            return readJavaFunction(schema, name, true);
+            return readFunctionWithSchema(schema, name);
         }
         boolean allowOverride = database.isAllowBuiltinAliasOverride();
         if (allowOverride) {
@@ -3882,16 +3922,27 @@ public class Parser {
         return readFunctionParameters(function);
     }
 
+    private Expression readFunctionWithSchema(Schema schema, String name) {
+        if (database.getMode().getEnum() == ModeEnum.PostgreSQL
+                && schema.getName().equals(database.sysIdentifier("PG_CATALOG"))) {
+            String upperName = database.getSettings().databaseToUpper ? name : StringUtils.toUpperEnglish(name);
+            Function function = FunctionsPostgreSQL.getFunction(database, upperName);
+            if (function != null) {
+                return readFunctionParameters(function);
+            }
+        }
+        return readJavaFunction(schema, name, true);
+    }
+
     private Function readFunctionParameters(Function function) {
         switch (function.getFunctionType()) {
-        case Function.CAST: {
+        case Function.CAST:
             function.addParameter(readExpression());
             read(AS);
             function.setDataType(parseColumnWithType(null));
             read(CLOSE_PAREN);
             break;
-        }
-        case Function.CONVERT: {
+        case Function.CONVERT:
             if (database.getMode().swapConvertFunctionParameters) {
                 function.setDataType(parseColumnWithType(null));
                 read(COMMA);
@@ -3904,31 +3955,28 @@ public class Parser {
                 read(CLOSE_PAREN);
             }
             break;
-        }
-        case Function.EXTRACT: {
-            function.addParameter(ValueExpression.get(ValueVarchar.get(currentToken)));
-            read();
+        case Function.EXTRACT:
+            readDateTimeField(function);
             read(FROM);
             function.addParameter(readExpression());
             read(CLOSE_PAREN);
             break;
-        }
         case Function.DATEADD:
-        case Function.DATEDIFF: {
-            if (currentTokenType == LITERAL) {
-                function.addParameter(ValueExpression.get(currentValue.convertTo(TypeInfo.TYPE_VARCHAR)));
-            } else {
-                function.addParameter(ValueExpression.get(ValueVarchar.get(currentToken)));
-            }
-            read();
+        case Function.DATEDIFF:
+            readDateTimeField(function);
             read(COMMA);
             function.addParameter(readExpression());
             read(COMMA);
             function.addParameter(readExpression());
             read(CLOSE_PAREN);
             break;
-        }
-        case Function.SUBSTRING: {
+        case Function.DATE_TRUNC:
+            readDateTimeField(function);
+            read(COMMA);
+            function.addParameter(readExpression());
+            read(CLOSE_PAREN);
+            break;
+        case Function.SUBSTRING:
             // Standard variants are:
             // SUBSTRING(X FROM 1)
             // SUBSTRING(X FROM 1 FOR 1)
@@ -3954,17 +4002,15 @@ public class Parser {
             }
             read(CLOSE_PAREN);
             break;
-        }
-        case Function.POSITION: {
+        case Function.POSITION:
             // can't read expression because IN would be read too early
             function.addParameter(readConcat());
             if (!readIf(COMMA)) {
-                read("IN");
+                read(IN);
             }
             function.addParameter(readExpression());
             read(CLOSE_PAREN);
             break;
-        }
         case Function.TRIM: {
             int flags;
             boolean needFrom = false;
@@ -4050,8 +4096,8 @@ public class Parser {
             tf.setColumns(columns);
             break;
         }
-        case Function.JSON_OBJECT: {
-            if (!readJsonObjectFunctionFlags(function, false)) {
+        case Function.JSON_OBJECT:
+            if (currentTokenType != CLOSE_PAREN && !readJsonObjectFunctionFlags(function, false)) {
                 do {
                     boolean withKey = readIf(KEY);
                     function.addParameter(readExpression());
@@ -4066,10 +4112,9 @@ public class Parser {
             }
             read(CLOSE_PAREN);
             break;
-        }
-        case Function.JSON_ARRAY: {
+        case Function.JSON_ARRAY:
             function.setFlags(Function.JSON_ABSENT_ON_NULL);
-            if (!readJsonObjectFunctionFlags(function, true)) {
+            if (currentTokenType != CLOSE_PAREN && !readJsonObjectFunctionFlags(function, true)) {
                 do {
                     function.addParameter(readExpression());
                 } while (readIf(COMMA));
@@ -4077,7 +4122,6 @@ public class Parser {
             }
             read(CLOSE_PAREN);
             break;
-        }
         default:
             if (!readIf(CLOSE_PAREN)) {
                 do {
@@ -4087,6 +4131,46 @@ public class Parser {
         }
         function.doneWithParameters();
         return function;
+    }
+
+    private void readDateTimeField(Function function) {
+        int field = -1;
+        switch (currentTokenType) {
+        case IDENTIFIER:
+            if (!currentTokenQuoted) {
+                field = DateTimeFunctions.getField(currentToken);
+            }
+            break;
+        case LITERAL:
+            if (currentValue.getValueType() == Value.VARCHAR) {
+                field = DateTimeFunctions.getField(currentValue.getString());
+            }
+            break;
+        case YEAR:
+            field = DateTimeFunctions.YEAR;
+            break;
+        case MONTH:
+            field = DateTimeFunctions.MONTH;
+            break;
+        case DAY:
+            field = DateTimeFunctions.DAY;
+            break;
+        case HOUR:
+            field = DateTimeFunctions.HOUR;
+            break;
+        case MINUTE:
+            field = DateTimeFunctions.MINUTE;
+            break;
+        case SECOND:
+            field = DateTimeFunctions.SECOND;
+        }
+        if (field >= 0) {
+            function.addParameter(ValueExpression.get(ValueInteger.get(field)));
+            read();
+        } else {
+            addExpected("date-time field");
+            throw getSyntaxError();
+        }
     }
 
     private WindowFunction readWindowFunction(String name) {
@@ -4663,25 +4747,21 @@ public class Parser {
             r = Function.getFunctionWithArgs(database, Function.ARRAY_GET, r, readExpression());
             read(CLOSE_BRACKET);
         }
-        if (readIf(COLON_COLON)) {
-            // PostgreSQL compatibility
-            if (isToken("PG_CATALOG")) {
-                read("PG_CATALOG");
-                read(DOT);
-            }
-            if (readIf("REGCLASS")) {
-                FunctionAlias f = findFunctionAlias(database.getMainSchema().getName(),
-                        database.sysIdentifier("PG_GET_OID"));
-                if (f == null) {
-                    throw getSyntaxError();
+        colonColon: if (readIf(COLON_COLON)) {
+            if (database.getMode().getEnum() == ModeEnum.PostgreSQL) {
+                // PostgreSQL compatibility
+                if (isToken("PG_CATALOG")) {
+                    read("PG_CATALOG");
+                    read(DOT);
                 }
-                Expression[] args = { r };
-                r = new JavaFunction(f, args);
-            } else {
-                Function function = Function.getFunctionWithArgs(database, Function.CAST, r);
-                function.setDataType(parseColumnWithType(null));
-                r = function;
+                if (readIf("REGCLASS")) {
+                    r = new Regclass(r);
+                    break colonColon;
+                }
             }
+            Function function = Function.getFunctionWithArgs(database, Function.CAST, r);
+            function.setDataType(parseColumnWithType(null));
+            r = function;
         }
         for (;;) {
             TypeInfo ti = (TypeInfo) readIntervalQualifier(null, false);
@@ -5191,7 +5271,7 @@ public class Parser {
              * PageStore's LobStorageBackend also needs this in databases that
              * were created in 1.4.197 and older versions.
              */
-            if (!database.isStarting() || !isKeyword(currentToken)) {
+            if (!database.isStarting() || !isKeyword(currentTokenType)) {
                 throw DbException.getSyntaxError(sqlCommand, parseIndex, "identifier");
             }
         }
@@ -5904,6 +5984,10 @@ public class Parser {
         throw getSyntaxError();
     }
 
+    private static boolean isKeyword(int tokenType) {
+        return tokenType >= FIRST_KEYWORD && tokenType <= LAST_KEYWORD;
+    }
+
     private boolean isKeyword(String s) {
         return ParserUtil.isKeyword(s, !identifiersToUpper);
     }
@@ -6607,7 +6691,7 @@ public class Parser {
 
     private Prepared parseCreate() {
         boolean orReplace = false;
-        if (readIf("OR")) {
+        if (readIf(OR)) {
             read("REPLACE");
             orReplace = true;
         }
@@ -7040,7 +7124,7 @@ public class Parser {
             }
         } while (readIf(COMMA)
                 || (database.getMode().getEnum() == ModeEnum.PostgreSQL
-                        && readIf("OR")));
+                        && readIf(OR)));
         read(ON);
         String tableName = readIdentifierWithSchema();
         checkSchema(schema);
