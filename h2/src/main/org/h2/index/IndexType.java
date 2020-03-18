@@ -7,6 +7,7 @@ package org.h2.index;
 
 /**
  * Represents information about the properties of an index
+ *
  */
 public class IndexType {
 
