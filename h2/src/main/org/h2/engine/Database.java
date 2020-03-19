@@ -960,6 +960,11 @@ public class Database implements DataHandler, CastDataProvider {
         }
     }
 
+    /**
+     * 添加源数据
+     * @param session
+     * @param obj
+     */
     private void addMeta(Session session, DbObject obj) {
         assert Thread.holdsLock(this);
         int id = obj.getId();
@@ -1840,7 +1845,7 @@ public class Database implements DataHandler, CastDataProvider {
 
     /**
      * Update an object in the system table.
-     *
+     * 修改源数据
      * @param session the session
      * @param obj the database object
      */
