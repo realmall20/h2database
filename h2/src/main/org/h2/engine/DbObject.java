@@ -11,6 +11,7 @@ import org.h2.util.HasSQL;
 
 /**
  * A database object such as a table, an index, or a user.
+ *
  */
 public interface DbObject extends HasSQL {
 

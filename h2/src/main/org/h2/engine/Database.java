@@ -187,6 +187,9 @@ public class Database implements DataHandler, CastDataProvider {
     private DatabaseEventListener eventListener;
     private int maxMemoryRows = SysProperties.MAX_MEMORY_ROWS;
     private int maxMemoryUndo = Constants.DEFAULT_MAX_MEMORY_UNDO;
+    /**
+     * 锁模式，隔离级别
+     */
     private int lockMode = Constants.DEFAULT_LOCK_MODE;
     private int maxLengthInplaceLob;
     private int allowLiterals = Constants.ALLOW_LITERALS_ALL;
@@ -971,6 +974,7 @@ public class Database implements DataHandler, CastDataProvider {
         if (id > 0 && !obj.isTemporary()) {
             if (isMVStore()) {
                 if (!isReadOnly()) {
+                    //创建一个row对象
                     Row r = meta.getTemplateRow();
                     MetaRecord.populateRowFromDBObject(obj, r);
                     assert objectIds.get(id);

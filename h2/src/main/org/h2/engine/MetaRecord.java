@@ -44,9 +44,9 @@ public class MetaRecord implements Comparable<MetaRecord> {
 
     /**
      * Copy metadata from the specified object into specified search row.
-     *
+     * 填充数据
      * @param obj
-     *            database object
+     *            database object 对象id 对象类型，对象对应的sql语句
      * @param r
      *            search row
      */
