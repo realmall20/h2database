@@ -11,10 +11,9 @@ import org.h2.value.ValueBigint;
 
 /**
  * The default implementation of a row in a table.
- * 表 行数据存贮的基本单位，不是存在mvstore 里面？
+ * 表 行数据存贮的基本单位，存在 里面？
  */
-public class DefaultRow extends Row
-{
+public class DefaultRow extends Row {
     protected final Value[] data;
     private         int     memory;
 
@@ -78,7 +77,7 @@ public class DefaultRow extends Row
 
     /**
      * Calculate the estimated memory used for this row, in bytes.
-     *
+     * 缓存计算
      * @return the memory
      */
     protected int calculateMemory() {

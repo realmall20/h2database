@@ -170,6 +170,7 @@ public class MVPrimaryIndex extends BaseIndex implements MVIndex<Long,SearchRow>
         long key = oldRow.getKey();
         assert mainIndexColumn != SearchRow.ROWID_INDEX || key != 0;
         assert key == newRow.getKey() : key + " != " + newRow.getKey();
+        //包含大对象？
         if (mvTable.getContainsLargeObject()) {
             for (int i = 0, len = oldRow.getColumnCount(); i < len; i++) {
                 Value oldValue = oldRow.getValue(i);
