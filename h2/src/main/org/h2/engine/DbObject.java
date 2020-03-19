@@ -6,12 +6,13 @@
 package org.h2.engine;
 
 import java.util.ArrayList;
+
 import org.h2.table.Table;
 import org.h2.util.HasSQL;
 
 /**
  * A database object such as a table, an index, or a user.
- *
+ * 数据库里面所有对象的基类
  */
 public interface DbObject extends HasSQL {
 
@@ -129,7 +130,7 @@ public interface DbObject extends HasSQL {
      * Build a SQL statement to re-create the object, or to create a copy of the
      * object with a different name or referencing a different table
      *
-     * @param table the new table
+     * @param table      the new table
      * @param quotedName the quoted name
      * @return the SQL statement
      */

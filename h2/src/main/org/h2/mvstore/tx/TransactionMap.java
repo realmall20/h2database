@@ -64,6 +64,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
     /**
      * Indicates whether underlying map was modified from within related transaction
+     * 是否从关联事务中修改了基础映射
      */
     private boolean hasChanges;
 
@@ -752,7 +753,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
     }
 
     /**
-     * 根据不同的隔离级别，返回不同的数据
+     * query的时候根据不同的隔离级别，返回不同的数据
      * @param from
      * @param to
      * @param reverse
@@ -767,6 +768,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
             case REPEATABLE_READ:
             case SNAPSHOT:
             case SERIALIZABLE:
+                //有数据变，返回数据和read_committed 迭代器是不一样的
                 if (hasChanges) {
                     return new RepeatableIterator<>(this, from, to, reverse, forEntries);
                 }

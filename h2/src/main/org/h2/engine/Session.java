@@ -1818,6 +1818,7 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
     /**
      * Start a new statement within a transaction.
      * @param command about to be started
+     *
      */
     @SuppressWarnings("incomplete-switch")
     public void startStatementWithinTransaction(Command command) {
@@ -1825,6 +1826,7 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
         if (transaction != null) {
             HashSet<MVMap<Object,VersionedValue<Object>>> maps = new HashSet<>();
             if (command != null) {
+                //获取所有的依赖sql
                 Set<DbObject> dependencies = command.getDependencies();
                 switch (transaction.getIsolationLevel()) {
                 case SNAPSHOT:

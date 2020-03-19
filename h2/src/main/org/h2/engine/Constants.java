@@ -115,12 +115,14 @@ public class Constants {
 
     /**
      * The lock mode that means no locking is used at all.
+     * 关闭锁
      */
     public static final int LOCK_MODE_OFF = 0;
 
     /**
      * The lock mode that means read locks are acquired, but they are released
      * immediately after the statement is executed.
+     *
      */
     public static final int LOCK_MODE_READ_COMMITTED = 3;
 

@@ -28,6 +28,7 @@ public enum IsolationLevel {
     /**
      * Dirty reads and non-repeatable reads aren't allowed; phantom reads are
      * allowed.
+     * 不可重复读 的纬度的 表锁 ？
      */
     REPEATABLE_READ(Connection.TRANSACTION_REPEATABLE_READ, Constants.LOCK_MODE_TABLE),
 
