@@ -186,6 +186,7 @@ public class ExpressionColumn extends Expression {
 
     @Override
     public Value getValue(Session session) {
+        //获取select语句
         Select select = columnResolver.getSelect();
         if (select != null) {
             SelectGroups groupData = select.getGroupDataIfCurrent(false);

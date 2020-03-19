@@ -508,7 +508,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
     /**
      * Create a new snapshot for this map.
-     *
+     * 创建镜像数据
      * @return the snapshot
      */
     Snapshot<K,VersionedValue<V>> createSnapshot() {
@@ -530,10 +530,13 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         AtomicReference<BitSet> holder = transaction.store.committingTransactions;
         BitSet committingTransactions = holder.get();
         while (true) {
+            //上次提交的版本信息
             BitSet prevCommittingTransactions = committingTransactions;
             //TODO 这个读是读取镜像吗？
             RootReference<K,VersionedValue<V>> root = map.getRoot();
+            //这次的版本信息
             committingTransactions = holder.get();
+            //
             if (committingTransactions == prevCommittingTransactions) {
                 return snapshotConsumer.apply(root, committingTransactions);
             }
@@ -748,6 +751,15 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         return chooseIterator(from, to, false, true);
     }
 
+    /**
+     * 根据不同的隔离级别，返回不同的数据
+     * @param from
+     * @param to
+     * @param reverse
+     * @param forEntries
+     * @param <X>
+     * @return
+     */
     private <X> Iterator<X> chooseIterator(K from, K to, boolean reverse, boolean forEntries) {
         switch (transaction.isolationLevel) {
             case READ_UNCOMMITTED:
@@ -990,10 +1002,17 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
     private abstract static class TMIterator<K,V,X> implements Iterator<X>
     {
+        /**
+         * 事务ID
+         */
         final int transactionId;
-
+        /**
+         * 正在提交中的事务
+          */
         final BitSet committingTransactions;
-
+        /**
+         * 游标，还是可以理解成链表数据。
+         */
         protected final Cursor<K, VersionedValue<V>> cursor;
 
         private final boolean forEntries;
