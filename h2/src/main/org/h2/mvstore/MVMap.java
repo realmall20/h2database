@@ -1817,6 +1817,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                         value = decisionMaker.selectValue(result, value);
                         p = p.copy();
                         if (index < 0) {
+                            //插入叶子节点
                             p.insertLeaf(-index - 1, key, value);
                             int keyCount;
                             while ((keyCount = p.getKeyCount()) > store.getKeysPerPage()
