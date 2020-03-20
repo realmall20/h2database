@@ -26,7 +26,9 @@ final class Snapshot<K,V> {
     final BitSet committingTransactions;
 
     Snapshot(RootReference<K,V> root, BitSet committingTransactions) {
+        //根路径
         this.root = root;
+        //提交的事务
         this.committingTransactions = committingTransactions;
     }
 

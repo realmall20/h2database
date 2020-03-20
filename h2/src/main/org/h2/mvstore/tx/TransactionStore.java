@@ -62,6 +62,8 @@ public class TransactionStore {
      * (write-ahead).
      * <p>
      * Key: opId, value: [ mapId, key, oldValue ].
+     * 事务ID => 对应的记录
+     *
      */
     @SuppressWarnings("unchecked")
     final MVMap<Long,Record<?,?>>[] undoLogs = new MVMap[MAX_OPEN_TRANSACTIONS];

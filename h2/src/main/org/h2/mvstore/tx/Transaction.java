@@ -376,11 +376,13 @@ public final class Transaction {
 
     private void markTransactionEnd() {
         if (!allowNonRepeatableRead()) {
+            //如果不是不可重复读，释放镜像数据
             releaseSnapshot();
         }
     }
 
     private void releaseSnapshot() {
+
         transactionMaps.clear();
         undoLogRootReferences = null;
         MVStore.TxCounter counter = txCounter;

@@ -318,6 +318,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
     }
 
     private V set(K key, V value) {
+        //删除的时候其实不是删除，而是添加一个操作记录
         txDecisionMaker.initialize(key, value);
         return set(key, txDecisionMaker);
     }

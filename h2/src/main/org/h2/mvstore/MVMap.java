@@ -23,6 +23,7 @@ import org.h2.util.MemoryEstimator;
 
 /**
  * A stored map.
+ *
  * <p>
  * All read and write operations can happen concurrently with all other
  * operations, without risk of corruption.
@@ -34,7 +35,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                             implements ConcurrentMap<K, V>
 {
     /**
-     * The store.
+     * 保存的mv store
      */
     public final MVStore store;
 
@@ -1750,6 +1751,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
             V result;
             unsavedMemoryHolder.value = 0;
             try {
+                // 从根节点查找key所在位置
                 CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key);
                 if(!locked && rootReference != getRoot()) {
                     continue;

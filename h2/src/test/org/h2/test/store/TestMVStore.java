@@ -118,6 +118,9 @@ public class TestMVStore extends TestBase {
     private void testRemoveMapRollback() {
         try (MVStore store = new MVStore.Builder().
                 open()) {
+            /**
+             * mv store 是一个多版本，包含回滚和提交功能的map
+             */
             MVMap<String, String> map = store.openMap("test");
             map.put("1", "Hello");
             //commit的时候是保存到文件？

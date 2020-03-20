@@ -108,19 +108,21 @@ public class TestTransactionStore extends TestBase {
         s.close();
     }
 
+    /**
+     *
+     * @throws InterruptedException
+     */
     private static void testConcurrentAddRemove() throws InterruptedException {
+        //open null 代表着纯内存数据库
         MVStore s = MVStore.open(null);
         int threadCount = 3;
         final int keyCount = 2;
         final TransactionStore ts = new TransactionStore(s);
         ts.init();
-
         final Random r = new Random(1);
-
         Task[] tasks = new Task[threadCount];
         for (int i = 0; i < threadCount; i++) {
             Task task = new Task() {
-
                 @Override
                 public void call() throws Exception {
                     TransactionMap<Integer, Integer> map = null;
