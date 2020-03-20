@@ -1753,6 +1753,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
             try {
                 // 从根节点查找key所在位置
                 CursorPos<K,V> pos = CursorPos.traverseDown(rootPage, key);
+                //自转导致根节点变动
                 if(!locked && rootReference != getRoot()) {
                     continue;
                 }
