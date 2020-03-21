@@ -1517,7 +1517,6 @@ public abstract class Page<K,V> implements Cloneable
         public void insertLeaf(int index, K key, V value) {
             int keyCount = getKeyCount();
             insertKey(index, key);
-
             if(values != null) {
                 V[] newValues = createValueStorage(keyCount + 1);
                 DataUtils.copyWithGap(values, newValues, keyCount, index);
