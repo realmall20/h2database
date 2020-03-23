@@ -345,8 +345,11 @@ public class MVStore implements AutoCloseable {
      * @throws IllegalArgumentException if the directory does not exist
      */
     MVStore(Map<String, Object> config) {
+        //
         recoveryMode = config.containsKey("recoveryMode");
+        //压缩等级
         compressionLevel = DataUtils.getConfigParam(config, "compress", 0);
+
         String fileName = (String) config.get("fileName");
         FileStore fileStore = (FileStore) config.get("fileStore");
         fileStoreIsProvided = fileStore != null;
@@ -354,8 +357,8 @@ public class MVStore implements AutoCloseable {
             fileStore = new FileStore();
         }
         this.fileStore = fileStore;
-
-        int pgSplitSize = 48; // for "mem:" case it is # of keys
+        // for "mem:" case it is # of keys
+        int pgSplitSize = 48;
         CacheLongKeyLIRS.Config cc = null;
         CacheLongKeyLIRS.Config cc2 = null;
         if (this.fileStore != null) {

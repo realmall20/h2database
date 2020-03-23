@@ -90,6 +90,9 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                 ((MVStore) config.get("store")).getKeysPerPage(),
                 config.containsKey("singleWriter") && (Boolean) config.get("singleWriter")
         );
+        /**
+         * 添加叶子节点
+         */
         setInitialRoot(createEmptyLeaf(), store.getCurrentVersion());
     }
 
@@ -103,6 +106,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     // meta map constructor
     MVMap(MVStore store, DataType<K> keyType, DataType<V> valueType) {
         this(store, keyType, valueType, 0, 0, new AtomicReference<>(), store.getKeysPerPage(), false);
+        //创建一个空间点
         setInitialRoot(createEmptyLeaf(), store.getCurrentVersion());
     }
 

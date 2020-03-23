@@ -6,7 +6,7 @@
 package org.h2.mvstore;
 
 /**
- * MvMap的跟节点
+ *  数据节点，
  * Class RootReference is an immutable structure to represent state of the MVMap as a whole
  * (not related to a particular B-Tree node).
  * Single structure would allow for non-blocking atomic state change.
@@ -22,7 +22,7 @@ public final class RootReference<K,V>
     public final Page<K,V> root;
     /**
      * The version used for writing.
-     * 版本号
+     * 每次更新一行数据，版本号增加
      */
     public final long version;
     /**
@@ -37,12 +37,12 @@ public final class RootReference<K,V>
      * Reference to the previous root in the chain.
      * That is the last root of the previous version, which had any data changes.
      * Versions without any data changes are dropped from the chain, as it built.
-     * 上一个版本的数据
+     * 比方说 用户 昵称 从 kk 改成了 tt ，那tt的上个版本数据就是kk
      */
     volatile RootReference<K,V> previous;
     /**
      * Counter for successful root updates.
-     * 更新成功次数
+     * 更新次数
      */
     final long updateCounter;
     /**
@@ -109,7 +109,9 @@ public final class RootReference<K,V>
 
     // This one is used for version change
     private RootReference(RootReference<K,V> r, long version, int attempt) {
+        // 更新的数据上一个版本。
         RootReference<K,V> previous = r;
+        // 根节点
         RootReference<K,V> tmp;
         while ((tmp = previous.previous) != null && tmp.root == r.root) {
             previous = tmp;
@@ -200,6 +202,7 @@ public final class RootReference<K,V>
 
 
     private boolean canUpdate() {
+        //当前拥有者I，当前线程ID
         return isFree() || ownerId == Thread.currentThread().getId();
     }
 
