@@ -1029,6 +1029,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                 "Unknown version {0}; this map was created in version is {1}",
                 version, createVersion);
         RootReference<K,V> rootReference = flushAndGetRoot();
+        //删除n版本之前的数据，默认n是5个版本
         removeUnusedOldVersions(rootReference);
         RootReference<K,V> previous;
         while ((previous = rootReference.previous) != null && previous.version >= version) {

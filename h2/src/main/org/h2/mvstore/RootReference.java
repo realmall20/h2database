@@ -173,7 +173,7 @@ public final class RootReference<K,V>
 
     /**
      * Removed old versions that are not longer used.
-     *
+     * 删除多少版本之前的数据
      * @param oldestVersionToKeep the oldest version that needs to be retained
      */
     void removeUnusedOldVersions(long oldestVersionToKeep) {
@@ -185,7 +185,7 @@ public final class RootReference<K,V>
         for(RootReference<K,V> rootRef = this; rootRef != null; rootRef = rootRef.previous) {
             if (rootRef.version < oldestVersionToKeep) {
                 RootReference<K,V> previous;
-                assert (previous = rootRef.previous) == null || previous.getAppendCounter() == 0 //
+                assert (previous = rootRef.previous) == null || previous.getAppendCounter() == 0
                         : oldestVersionToKeep + " " + rootRef.previous;
                 rootRef.previous = null;
             }
@@ -212,6 +212,7 @@ public final class RootReference<K,V>
 
     private RootReference<K,V> tryUpdate(RootReference<K,V> updatedRootReference) {
         assert canUpdate();
+        //单个数据更新是线程安全的。
         return root.map.compareAndSetRoot(this, updatedRootReference) ? updatedRootReference : null;
     }
 
