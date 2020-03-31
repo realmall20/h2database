@@ -1319,7 +1319,7 @@ public class MVStore implements AutoCloseable {
         // we need to prevent re-entrance, which may be possible,
         // because meta map is modified within storeNow() and that
         // causes beforeWrite() call with possibility of going back here
-        // 查看锁是否被挂起
+        // 查看锁是否被挂起 ，当前需要保存的版本小于0（没有线程在执行提交操作）
         if (!storeLock.isHeldByCurrentThread() || currentStoreVersion < 0) {
             storeLock.lock();
             try {
@@ -1677,13 +1677,14 @@ public class MVStore implements AutoCloseable {
     /**
      * Shrink the file if possible, and if at least a given percentage can be
      * saved.
-     *
+     * 压缩文件 ，
      * @param minPercent the minimum percentage to save
      */
     private void shrinkFileIfPossible(int minPercent) {
         if (fileStore.isReadOnly()) {
             return;
         }
+        //获取文件使用的字节数
         long end = getFileLengthInUse();
         long fileSize = fileStore.size();
         if (end >= fileSize) {
@@ -1737,12 +1738,14 @@ public class MVStore implements AutoCloseable {
      * Check whether there are any unsaved changes.
      *
      * @return if there are any changes
+     * 是否有没有保存的改变
      */
     public boolean hasUnsavedChanges() {
         if (metaChanged) {
             return true;
         }
         for (MVMap<?, ?> m : maps.values()) {
+            // 判断 map 是否已经关闭
             if (!m.isClosed()) {
                 if (m.hasChangesSince(lastStoredVersion)) {
                     return true;
@@ -1752,6 +1755,11 @@ public class MVStore implements AutoCloseable {
         return false;
     }
 
+    /**
+     * 获取块头
+     * @param block
+     * @return
+     */
     private Chunk readChunkHeader(long block) {
         long p = block * BLOCK_SIZE;
         ByteBuffer buff = fileStore.readFully(p, Chunk.MAX_HEADER_LENGTH);
@@ -1959,6 +1967,7 @@ public class MVStore implements AutoCloseable {
         int length = chunk.len * BLOCK_SIZE;
         buff.limit(length);
         ByteBuffer readBuff = fileStore.readFully(start, length);
+        //获取块头
         Chunk chunkFromFile = Chunk.readChunkHeader(readBuff, start);
         int chunkHeaderLen = readBuff.position();
         buff.position(chunkHeaderLen);
@@ -1991,6 +2000,7 @@ public class MVStore implements AutoCloseable {
     /**
      * Force all stored changes to be written to the storage. The default
      * implementation calls FileChannel.force(true).
+     * 保证所有的的变更都写入到文件中 ，默认通过 FileChannel.force(true) 实现
      */
     public void sync() {
         checkOpen();

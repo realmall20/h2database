@@ -18,6 +18,9 @@ import java.util.HashMap;
  * Chunks are page aligned (each page is usually 4096 bytes).
  * There are at most 67 million (2^26) chunks,
  * each chunk is at most 2 GB large.
+ *
+ * 一块数据，包含一个或者多个的 page
+ *
  */
 public final class Chunk
 {
