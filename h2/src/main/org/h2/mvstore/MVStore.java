@@ -1344,8 +1344,10 @@ public class MVStore implements AutoCloseable {
      * @param reservedHigh
      */
     private void store(long reservedLow, long reservedHigh) {
+        //确保锁被当前线程持有
         assert storeLock.isHeldByCurrentThread();
         if (isOpenOrStopping()) {
+
             if (hasUnsavedChanges()) {
                 dropUnusedChunks();
                 try {

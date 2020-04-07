@@ -26,27 +26,32 @@ public class FileStore {
 
     /**
      * The number of read operations.
+     * 读的次数
      */
     protected final AtomicLong readCount = new AtomicLong();
 
     /**
      * The number of read bytes.
+     * 读的字节数
      */
     protected final AtomicLong readBytes = new AtomicLong();
 
     /**
      * The number of write operations.
+     * 写的次数
      */
     protected final AtomicLong writeCount = new AtomicLong();
 
     /**
      * The number of written bytes.
+     * 读的字节数
      */
     protected final AtomicLong writeBytes = new AtomicLong();
 
     /**
      * The free spaces between the chunks. The first block to use is block 2
      * (the first two blocks are the store header).
+     *
      */
     protected final FreeSpaceBitSet freeSpace =
             new FreeSpaceBitSet(2, MVStore.BLOCK_SIZE);
@@ -78,6 +83,7 @@ public class FileStore {
 
     /**
      * The file lock.
+     * 文件锁
      */
     private FileLock fileLock;
 

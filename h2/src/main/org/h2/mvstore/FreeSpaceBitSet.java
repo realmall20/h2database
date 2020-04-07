@@ -38,6 +38,7 @@ public class FreeSpaceBitSet {
      * rightmost bit set to 1 means that last allocation failed to find a hole
      * big enough, and next bit set to 0 means that previous allocation request
      * have found one.
+     *
      */
     private int failureFlags;
 
