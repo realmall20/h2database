@@ -437,9 +437,13 @@ public abstract class Page<K,V> implements Cloneable
      * @param extraKeys extra key values
      */
     final void expandKeys(int extraKeyCount, K[] extraKeys) {
+        //获取当前拥有的key 总数
         int keyCount = getKeyCount();
+        //创建一个对应key count的 数组
         K[] newKeys = createKeyStorage(keyCount + extraKeyCount);
+        //把原来拥有的key 拷贝到新的数组里面
         System.arraycopy(keys, 0, newKeys, 0, keyCount);
+        //把新的key拷贝的新的数组里面
         System.arraycopy(extraKeys, 0, newKeys, keyCount, extraKeyCount);
         keys = newKeys;
     }

@@ -1229,12 +1229,15 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     private RootReference<K,V> flushAppendBuffer(RootReference<K,V> rootReference, boolean fullFlush) {
         boolean preLocked = rootReference.isLockedByCurrentThread();
         boolean locked = preLocked;
+        //每页存放的key数量
         int keysPerPage = store.getKeysPerPage();
         try {
             IntValueHolder unsavedMemoryHolder = new IntValueHolder();
             int attempt = 0;
             int keyCount;
+
             int availabilityThreshold = fullFlush ? 0 : keysPerPage - 1;
+
             while ((keyCount = rootReference.getAppendCounter()) > availabilityThreshold) {
                 if (!locked) {
                     // instead of just calling lockRoot() we loop here and check if someone else
@@ -1260,9 +1263,11 @@ public class MVMap<K, V> extends AbstractMap<K, V>
 
                 int remainingBuffer = 0;
                 Page<K,V> page = null;
+                // 每页可以存的key值 减去 当前页面拥有的key值 等于还可以使用的
                 int available = keysPerPage - p.getKeyCount();
                 if (available > 0) {
                     p = p.copy();
+                    //如果 操作数（每次操作其实就是一个key v 数据）小于 可以使用的次数
                     if (keyCount <= available) {
                         p.expand(keyCount, keysBuffer, valuesBuffer);
                     } else {

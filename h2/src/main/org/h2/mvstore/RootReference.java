@@ -52,6 +52,7 @@ public final class RootReference<K,V>
     final long updateAttemptCounter;
     /**
      * Size of the occupied part of the append buffer.
+     *
      */
     private final byte appendCounter;
 
@@ -68,6 +69,12 @@ public final class RootReference<K,V>
         this.appendCounter = 0;
     }
 
+    /**
+     *  页对象重新分配的时候
+     * @param r
+     * @param root
+     * @param updateAttemptCounter
+     */
     private RootReference(RootReference<K,V> r, Page<K,V> root, long updateAttemptCounter) {
         this.root = root;
         this.version = r.version;
@@ -200,7 +207,10 @@ public final class RootReference<K,V>
         return holdCount == 0;
     }
 
-
+    /**
+     * 是否可以被更新
+     * @return
+     */
     private boolean canUpdate() {
         //当前拥有者I，当前线程ID
         return isFree() || ownerId == Thread.currentThread().getId();
