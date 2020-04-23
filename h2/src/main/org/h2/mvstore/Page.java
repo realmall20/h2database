@@ -1458,7 +1458,9 @@ public abstract class Page<K,V> implements Cloneable
         public Page<K,V> split(int at) {
             assert !isSaved();
             int b = getKeyCount() - at;
+            //获取新的node的 key
             K[] bKeys = splitKeys(at, b);
+            //获取新的node的 value 空间
             V[] bValues = createValueStorage(b);
             if(values != null) {
                 V[] aValues = createValueStorage(at);
@@ -1468,6 +1470,7 @@ public abstract class Page<K,V> implements Cloneable
             }
             Page<K,V> newPage = createLeaf(map, bKeys, bValues, 0);
             if(isPersistent()) {
+                //重新计算内存
                 recalculateMemory();
             }
             return newPage;
