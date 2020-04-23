@@ -627,11 +627,11 @@ public final class DataUtils {
      * the position: the chunk id, the page sequential number, the maximum length, and the type
      * (node or leaf).
      *
-     * @param chunkId the chunk id
-     * @param offset the offset
-     * @param length the length
+     * @param chunkId the chunk id 块ID
+     * @param offset the offset 偏移量
+     * @param length the length 最大长度
      * @param type the page type (1 for node, 0 for leaf)
-     * @return the position
+     * @return the position 位置（类似唯一ID，包含块ID，偏移量，）
      */
     public static long getPagePos(int chunkId, int offset, int length, int type) {
         long pos = (long) chunkId << 38;

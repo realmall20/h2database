@@ -153,6 +153,7 @@ public class MVStore implements AutoCloseable {
     /**
      * The block size (physical sector size) of the disk. The store header is
      * written twice, one copy in each block, to ensure it survives a crash.
+     * 块大小
      */
     static final int BLOCK_SIZE = 4 * 1024;
 
@@ -239,6 +240,7 @@ public class MVStore implements AutoCloseable {
 
     /**
      * The metadata map. Write access to this map needs to be done under storeLock.
+     *
      */
     private final MVMap<String, String> meta;
 

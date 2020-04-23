@@ -242,7 +242,9 @@ public abstract class Page<K,V> implements Cloneable
     static <K,V> Page<K,V> read(ByteBuffer buff, long pos, MVMap<K,V> map) {
         boolean leaf = (DataUtils.getPageType(pos) & 1) == PAGE_TYPE_LEAF;
         Page<K,V> p = leaf ? new Leaf<>(map) : new NonLeaf<>(map);
+        //读取的文件位置
         p.pos = pos;
+        //读取一块数据，生成page对象？
         p.read(buff);
         return p;
     }
@@ -562,6 +564,7 @@ public abstract class Page<K,V> implements Cloneable
      * @param buff the buffer to read from
      */
     private void read(ByteBuffer buff) {
+        //获取块ID
         int chunkId = DataUtils.getPageChunkId(pos);
         int offset = DataUtils.getPageOffset(pos);
 

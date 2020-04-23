@@ -158,6 +158,7 @@ public class PageStore implements CacheWriter {
 
     /**
      * Number of pages (including free pages).
+     * 总的节点数据
      */
     private int pageCount;
 
