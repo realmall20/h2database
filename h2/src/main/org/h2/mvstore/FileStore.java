@@ -100,6 +100,7 @@ public class FileStore {
      * @return the byte buffer
      */
     public ByteBuffer readFully(long pos, int len) {
+        //分配内存条
         ByteBuffer dst = ByteBuffer.allocate(len);
         DataUtils.readFully(file, pos, dst);
         readCount.incrementAndGet();

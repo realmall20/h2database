@@ -759,6 +759,11 @@ public class ObjectDataType extends BasicDataType<Object> {
             return a.compareTo(b);
         }
 
+        /**
+         * 每种数据类型一个值占有的内存
+         * @param obj
+         * @return
+         */
         @Override
         public int getMemory(Long obj) {
             return 30;

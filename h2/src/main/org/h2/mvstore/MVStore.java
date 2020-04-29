@@ -2289,8 +2289,14 @@ public class MVStore implements AutoCloseable {
             Page<K, V> p = readPageFromCache(pos);
             if (p == null) {
                 try {
+                    /**
+                     * 获取块数据
+                     */
                     Chunk chunk = getChunk(pos);
                     int pageOffset = DataUtils.getPageOffset(pos);
+                    /**
+                     * 读取一页的数据
+                     */
                     ByteBuffer buff = chunk.readBufferForPage(fileStore, pageOffset, pos);
                     p = Page.read(buff, pos, map);
                     if (p.pageNo < 0) {
