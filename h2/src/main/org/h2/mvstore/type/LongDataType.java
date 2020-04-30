@@ -18,12 +18,12 @@ import java.nio.ByteBuffer;
  *
  * @author <a href='mailto:andrei.tokar@gmail.com'>Andrei Tokar</a>
  */
-public class LongDataType extends BasicDataType<Long>
-{
+public class LongDataType extends BasicDataType<Long> {
     public static final LongDataType INSTANCE = new LongDataType();
     public static final Long[] EMPTY_LONG_ARR = new Long[0];
 
-    public LongDataType() {}
+    public LongDataType() {
+    }
 
     @Override
     public int getMemory(Long obj) {
@@ -55,6 +55,7 @@ public class LongDataType extends BasicDataType<Long>
         long key = keyObj;
         Long[] storage = cast(storageObj);
         int low = 0;
+        //最大值
         int high = size - 1;
         // the cached index minus one, so that
         // for the first time (when cachedCompare is 0),
@@ -66,6 +67,22 @@ public class LongDataType extends BasicDataType<Long>
         return binarySearch(key, storage, low, high, x);
     }
 
+    /**
+     * 中间查询
+     * 1，2，3，4，5 查 7
+     * 最大的可能是 5+5 >>>1 =0 return -1  意味着找不到。
+     * <p>
+     * 1,2,3,4,6 查 5呢
+     * 1: 5 > 1 low=0 high=4 ,x=2
+     * 2: 5>3  low=3 high=4 ,x=3
+     * 3: 5>4 low=4 high=4 , x=0 还是找不到，还是返回-1 。
+     * @param key
+     * @param storage
+     * @param low
+     * @param high
+     * @param x
+     * @return
+     */
     private static int binarySearch(long key, Long[] storage, int low, int high, int x) {
         while (low <= high) {
             long midVal = storage[x];
@@ -74,10 +91,11 @@ public class LongDataType extends BasicDataType<Long>
             } else if (key < midVal) {
                 high = x - 1;
             } else {
-                return x;
+                return x;//这种情况下可以说刚好找到
             }
             x = (low + high) >>> 1;
         }
+        // 这种情况下算怎么回事 ？？？
         return -(low + 1);
     }
 }

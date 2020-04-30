@@ -11,12 +11,11 @@ package org.h2.mvstore;
  * from a specific (target) key within a leaf node all the way up to te root
  * (bottom up path).
  */
-public final class CursorPos<K,V>
-{
+public final class CursorPos<K, V> {
     /**
      * The page at the current level.
      */
-    public Page<K,V> page;
+    public Page<K, V> page;
 
     /**
      * Index of the key (within page above) used to go down to a lower level
@@ -29,10 +28,10 @@ public final class CursorPos<K,V>
      * Next node in the linked list, representing the position within parent level,
      * or null, if we are at the root level already.
      */
-    public CursorPos<K,V> parent;
+    public CursorPos<K, V> parent;
 
 
-    public CursorPos(Page<K,V> page, int index, CursorPos<K,V> parent) {
+    public CursorPos(Page<K, V> page, int index, CursorPos<K, V> parent) {
         this.page = page;
         this.index = index;
         this.parent = parent;
@@ -43,12 +42,15 @@ public final class CursorPos<K,V>
      * rooted at a given Page. Resulting path starts at "insertion point" for a
      * given key and goes back to the root.
      *
-     * @param page      root of the tree
-     * @param key       the key to search for
+     * @param page root of the tree
+     * @param key  the key to search for
      * @return head of the CursorPos chain (insertion point)
      */
-    static <K,V> CursorPos<K,V> traverseDown(Page<K,V> page, K key) {
-        CursorPos<K,V> cursorPos = null;
+    static <K, V> CursorPos<K, V> traverseDown(Page<K, V> page, K key) {
+        CursorPos<K, V> cursorPos = null;
+        /**
+         * 如果不分页
+         */
         while (!page.isLeaf()) {
             int index = page.binarySearch(key) + 1;
             if (index < 0) {
@@ -68,7 +70,7 @@ public final class CursorPos<K,V>
      */
     int processRemovalInfo(long version) {
         int unsavedMemory = 0;
-        for (CursorPos<K,V> head = this; head != null; head = head.parent) {
+        for (CursorPos<K, V> head = this; head != null; head = head.parent) {
             unsavedMemory += head.page.removePage(version);
         }
         return unsavedMemory;
