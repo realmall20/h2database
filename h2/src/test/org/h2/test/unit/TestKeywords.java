@@ -42,7 +42,7 @@ public class TestKeywords extends TestBase {
      *            ignored
      */
     public static void main(String... a) throws Exception {
-        TestBase.createCaller().init().test();
+        TestBase.createCaller().init().testFromMain();
     }
 
     @Override
@@ -121,6 +121,11 @@ public class TestKeywords extends TestBase {
                             assertEquals(10, rs.getInt(1));
                             assertFalse(rs.next());
                             assertEquals(s, rs.getMetaData().getColumnLabel(1));
+                        }
+                        try (ResultSet rs = stat.executeQuery("SELECT CASE " + s + " WHEN 10 THEN 1 END FROM " + s)) {
+                            assertTrue(rs.next());
+                            assertEquals(1, rs.getInt(1));
+                            assertFalse(rs.next());
                         }
                         stat.execute("DROP TABLE " + s);
                         stat.execute("CREATE TABLE TEST(" + s + " VARCHAR) AS VALUES '-'");

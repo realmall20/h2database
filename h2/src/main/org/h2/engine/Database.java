@@ -23,7 +23,6 @@ import java.util.StringTokenizer;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-
 import org.h2.api.DatabaseEventListener;
 import org.h2.api.ErrorCode;
 import org.h2.api.JavaObjectSerializer;
@@ -44,6 +43,7 @@ import org.h2.message.Trace;
 import org.h2.message.TraceSystem;
 import org.h2.mode.PgCatalogTable;
 import org.h2.mvstore.MVStore;
+import org.h2.mvstore.MVStoreException;
 import org.h2.mvstore.db.LobStorageMap;
 import org.h2.mvstore.db.MVTableEngine;
 import org.h2.pagestore.PageStore;
@@ -457,33 +457,6 @@ public class Database implements DataHandler, CastDataProvider {
     }
 
     /**
-     * Check if a database with the given name exists.
-     *
-     * @param name the name of the database (including path)
-     * @return true if one exists
-     */
-    static boolean exists(String name) {
-        if (FileUtils.exists(name + Constants.SUFFIX_PAGE_FILE)) {
-            return true;
-        }
-        return FileUtils.exists(name + Constants.SUFFIX_MV_FILE);
-    }
-
-    /**
-     * Check if a database with the given name exists.
-     *
-     * @param name
-     *            the name of the database (including path)
-     * @param mvStore
-     *            {@code true} to check MVStore file only, {@code false} to
-     *            check PageStore file only
-     * @return true if one exists
-     */
-    static boolean exists(String name, boolean mvStore) {
-        return FileUtils.exists(name + (mvStore ? Constants.SUFFIX_MV_FILE : Constants.SUFFIX_PAGE_FILE));
-    }
-
-    /**
      * Get the trace object for the given module id.
      *
      * @param moduleId the module id
@@ -550,24 +523,6 @@ public class Database implements DataHandler, CastDataProvider {
 
     private synchronized void open(int traceLevelFile, int traceLevelSystemOut) {
         if (persistent) {
-            String dataFileName = databaseName + Constants.SUFFIX_OLD_DATABASE_FILE;
-            boolean existsData = FileUtils.exists(dataFileName);
-            String pageFileName = databaseName + Constants.SUFFIX_PAGE_FILE;
-            String mvFileName = databaseName + Constants.SUFFIX_MV_FILE;
-            boolean existsPage = FileUtils.exists(pageFileName);
-            boolean existsMv = FileUtils.exists(mvFileName);
-            if (existsData && (!existsPage && !existsMv)) {
-                throw DbException.getFileVersionError(dataFileName);
-            }
-            if (existsPage && !FileUtils.canWrite(pageFileName)) {
-                readOnly = true;
-            }
-            if (existsMv && !FileUtils.canWrite(mvFileName)) {
-                readOnly = true;
-            }
-            if (existsPage && !existsMv) {
-                dbSettings.setMvStore(false);
-            }
             if (readOnly) {
                 if (traceLevelFile >= TraceSystem.DEBUG) {
                     String traceFile = Utils.getProperty("java.io.tmpdir", ".") +
@@ -1351,25 +1306,28 @@ public class Database implements DataHandler, CastDataProvider {
     public synchronized void removeSession(Session session) {
         if (session != null) {
             exclusiveSession.compareAndSet(session, null);
-            userSessions.remove(session);
-            if (session != systemSession && session != lobSession) {
+            if (userSessions.remove(session)) {
                 trace.info("disconnecting session #{0}", session.getId());
             }
         }
-        if (userSessions.isEmpty() &&
-                session != systemSession && session != lobSession) {
-            if (closeDelay == 0) {
-                close(false);
-            } else if (closeDelay < 0) {
-                return;
-            } else {
-                delayedCloser = new DelayedDatabaseCloser(this, closeDelay * 1000);
+        if (isUserSession(session)) {
+            if (userSessions.isEmpty()) {
+                if (closeDelay == 0) {
+                    close(false);
+                } else if (closeDelay < 0) {
+                    return;
+                } else {
+                    delayedCloser = new DelayedDatabaseCloser(this, closeDelay * 1000);
+                }
+            }
+            if (session != null) {
+                trace.info("disconnected session #{0}", session.getId());
             }
         }
-        if (session != systemSession &&
-                session != lobSession && session != null) {
-            trace.info("disconnected session #{0}", session.getId());
-        }
+    }
+
+    private boolean isUserSession(Session session) {
+        return session != systemSession && session != lobSession;
     }
 
     private synchronized void closeAllSessionsExcept(Session except) {
@@ -1506,7 +1464,7 @@ public class Database implements DataHandler, CastDataProvider {
             }
             tempFileDeleter.deleteAll();
             try {
-                closeOpenFilesAndUnlock(true);
+                closeOpenFilesAndUnlock(compactMode != CommandInterface.SHUTDOWN_IMMEDIATELY);
             } catch (DbException e) {
                 trace.error(e, "close");
             }
@@ -1593,11 +1551,12 @@ public class Database implements DataHandler, CastDataProvider {
             if (store != null) {
                 MVStore mvStore = store.getMvStore();
                 if (mvStore != null && !mvStore.isClosed()) {
-                    boolean compactFully =
+                    long allowedCompactionTime =
+                            compactMode == CommandInterface.SHUTDOWN_IMMEDIATELY ? 0 :
                             compactMode == CommandInterface.SHUTDOWN_COMPACT ||
                             compactMode == CommandInterface.SHUTDOWN_DEFRAG ||
-                            getSettings().defragAlways;
-                    store.close(compactFully ? -1 : dbSettings.maxCompactTime);
+                            dbSettings.defragAlways ? -1 : dbSettings.maxCompactTime;
+                    store.close(allowedCompactionTime);
                 }
             }
             if (systemSession != null) {
@@ -1608,7 +1567,7 @@ public class Database implements DataHandler, CastDataProvider {
                 lobSession.close();
                 lobSession = null;
             }
-            closeFiles();
+            closeFiles(false);
             if (persistent && lock == null &&
                     fileLockMethod != FileLockMethod.NO &&
                     fileLockMethod != FileLockMethod.FS) {
@@ -1628,10 +1587,14 @@ public class Database implements DataHandler, CastDataProvider {
         }
     }
 
-    private synchronized void closeFiles() {
+    private synchronized void closeFiles(boolean immediately) {
         try {
             if (store != null) {
-                store.closeImmediately();
+                if (immediately) {
+                    store.closeImmediately();
+                } else {
+                    store.close(0);
+                }
             }
             if (pageStore != null) {
                 pageStore.close();
@@ -2286,7 +2249,7 @@ public class Database implements DataHandler, CastDataProvider {
     }
 
     public Throwable getBackgroundException() {
-        IllegalStateException exception = store.getMvStore().getPanicException();
+        MVStoreException exception = store.getMvStore().getPanicException();
         if(exception != null) {
             return exception;
         }
@@ -2410,8 +2373,12 @@ public class Database implements DataHandler, CastDataProvider {
         switch (lockMode) {
         case Constants.LOCK_MODE_OFF:
         case Constants.LOCK_MODE_READ_COMMITTED:
+            break;
         case Constants.LOCK_MODE_TABLE:
         case Constants.LOCK_MODE_TABLE_GC:
+            if (isMVStore()) {
+                lockMode = Constants.LOCK_MODE_READ_COMMITTED;
+            }
             break;
         default:
             throw DbException.getInvalidValueException("lock mode", lockMode);
@@ -2703,7 +2670,8 @@ public class Database implements DataHandler, CastDataProvider {
         } catch (DbException e) {
             // ignore
         }
-        closeFiles();
+        closeFiles(true);
+        powerOffCount = 0;
     }
 
     @Override

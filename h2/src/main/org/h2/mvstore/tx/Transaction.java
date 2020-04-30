@@ -247,7 +247,7 @@ public final class Transaction {
                     break;
             }
             if (!valid) {
-                throw DataUtils.newIllegalStateException(
+                throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_TRANSACTION_ILLEGAL_STATE,
                         "Transaction was illegally transitioned from {0} to {1}",
                         STATUS_NAMES[currentStatus], STATUS_NAMES[status]);
@@ -403,7 +403,7 @@ public final class Transaction {
         long currentState = statusAndLogId.getAndIncrement();
         long logId = getLogId(currentState);
         if (logId >= LOG_ID_LIMIT) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_TRANSACTION_TOO_BIG,
                     "Transaction {0} has too many changes",
                     transactionId);
@@ -421,7 +421,7 @@ public final class Transaction {
         long currentState = statusAndLogId.decrementAndGet();
         long logId = getLogId(currentState);
         if (logId >= LOG_ID_LIMIT) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_TRANSACTION_CORRUPT,
                     "Transaction {0} has internal error",
                     transactionId);
@@ -547,7 +547,7 @@ public final class Transaction {
         }
         // this is moved outside of finally block to avert masking original exception, if any
         if (!success) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_TRANSACTION_ILLEGAL_STATE,
                     "Transaction {0} concurrently modified while rollback to savepoint was in progress",
                     transactionId);
@@ -626,7 +626,7 @@ public final class Transaction {
      */
     private void checkOpen(int status) {
         if (status != STATUS_OPEN) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_TRANSACTION_ILLEGAL_STATE,
                     "Transaction {0} has status {1}, not OPEN", transactionId, STATUS_NAMES[status]);
         }
@@ -637,7 +637,7 @@ public final class Transaction {
      */
     private void checkNotClosed() {
         if (getStatus() == STATUS_CLOSED) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_CLOSED, "Transaction {0} is closed", transactionId);
         }
     }
@@ -684,7 +684,7 @@ public final class Transaction {
                                     + " modified by transaction %s%n",
                             transactionId, blockingMapName, blockingKey, toWaitFor));
                     if (isDeadlocked(toWaitFor)) {
-                        throw DataUtils.newIllegalStateException(DataUtils.ERROR_TRANSACTIONS_DEADLOCK, "{0}",
+                        throw DataUtils.newMVStoreException(DataUtils.ERROR_TRANSACTIONS_DEADLOCK, "{0}",
                                 details.toString());
                     }
                 }

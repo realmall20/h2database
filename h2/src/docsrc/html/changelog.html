@@ -21,6 +21,57 @@ Change Log
 
 <h2>Next Version (unreleased)</h2>
 <ul>
+<li>Issue #2584: Regression in NULL handling in multiple AND or OR conditions
+</li>
+<li>PR #2577: PgServer: `array_to_string()` and `set join_collapse_limit`
+</li>
+<li>PR #2568: Add BIT_XOR aggregate function
+</li>
+<li>PR #2565: Assorted minor changes
+</li>
+<li>PR #2563: defrag is not contributing much, remove from test run
+</li>
+<li>PR #2562: new exception MVStoreException
+</li>
+<li>PR #2557: don't throw IllegalStateException in checkOpen
+</li>
+<li>PR #2554: Reenable mvstore TestCrashAPI
+</li>
+<li>Issue #2556: TestOutOfMemory: Table "STUFF" not found
+</li>
+<li>PR #2555: Move current datetime value functions into own class
+</li>
+<li>PR #2547: split up the ValueLob classes
+</li>
+<li>PR #2542: Pipelining mvstore chunk creation / save
+</li>
+<li>Issue #2550: NullPointerException with MERGE containing unknown column in AND condition of WHEN
+</li>
+<li>Issue #2546: Disallow empty CASE specifications and END CASE
+</li>
+<li>Issue #2530: Long query with many AND expressions causes StackOverflowError
+</li>
+<li>PR #2543: Improve case specification support and fix some issues with it
+</li>
+<li>Issue #2539: Replace non-standard functions with standard code directly in Parser
+</li>
+<li>Issue #2521: Disallow untyped arrays
+</li>
+<li>Issue #2532: Duplicate column names in derived table should be acceptable in the presence of a derived column list
+that removes ambiguities
+</li>
+<li>PR #2527: Feature: allow @ meta commands from Console
+</li>
+<li>PR #2526: Reduce I/O during database presence check and restrict some compatibility settings to their modes
+</li>
+<li>PR #2525: Restore support of third-party drivers in the Shell tool
+</li>
+<li>Issue #1710: getHigherType() returns incorrect type for some arguments
+</li>
+<li>PR #2516: SHUTDOWN IMMEDIATELY should be a normal shut down
+</li>
+<li>PR #2515: Fix nested comments in ScriptReader
+</li>
 <li>Issue #2511: Restrict Oracle compatibility functions to Oracle compatibility mode
 </li>
 <li>PR #2508: Minor refactoring around Tx isolation level

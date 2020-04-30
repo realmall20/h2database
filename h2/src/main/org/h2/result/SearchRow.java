@@ -98,7 +98,7 @@ public abstract class SearchRow extends Value
 
     @Override
     public int getValueType() {
-        return Value.ARRAY;
+        return Value.ROW;
     }
 
     @Override

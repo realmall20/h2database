@@ -34,12 +34,13 @@ public class TestOptimizations extends TestDb {
      * @param a ignored
      */
     public static void main(String... a) throws Exception {
-        TestBase.createCaller().init().test();
+        TestBase.createCaller().init().testFromMain();
     }
 
     @Override
     public void test() throws Exception {
         deleteDb("optimizations");
+        testConditionsStackOverflow();
         testIdentityIndexUsage();
         testFastRowIdCondition();
         testExplainRoundTrip();
@@ -1189,6 +1190,20 @@ public class TestOptimizations extends TestDb {
                 "(age = 25 AND name = 'isuru') ");
         rs.next();
         assertTrue("engineer".equals(rs.getString("occupation")));
+        conn.close();
+    }
+
+    private void testConditionsStackOverflow() throws SQLException {
+        deleteDb("optimizations");
+        Connection conn = getConnection("optimizations");
+        Statement stat = conn.createStatement();
+        StringBuilder b = new StringBuilder("SELECT 1");
+        for (int i=0; i<10000; i++) {
+            b.append(" AND 1");
+        }
+        ResultSet rs = stat.executeQuery(b.toString());
+        rs.next();
+        assertTrue(rs.getBoolean(1));
         conn.close();
     }
 }

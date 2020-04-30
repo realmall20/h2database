@@ -46,18 +46,6 @@ public class Constants {
     public static final String BUILD_VENDOR_AND_VERSION = null;
 
     /**
-     * The TCP protocol version number 12.
-     * @since 1.3.168 (2012-07-13)
-     */
-    public static final int TCP_PROTOCOL_VERSION_12 = 12;
-
-    /**
-     * The TCP protocol version number 13.
-     * @since 1.3.174 (2013-10-19)
-     */
-    public static final int TCP_PROTOCOL_VERSION_13 = 13;
-
-    /**
      * The TCP protocol version number 14.
      * @since 1.3.176 (2014-04-05)
      */
@@ -94,14 +82,20 @@ public class Constants {
     public static final int TCP_PROTOCOL_VERSION_19 = 19;
 
     /**
+     * The TCP protocol version number 20.
+     * @since 1.4.201 (TODO)
+     */
+    public static final int TCP_PROTOCOL_VERSION_20 = 20;
+
+    /**
      * Minimum supported version of TCP protocol.
      */
-    public static final int TCP_PROTOCOL_VERSION_MIN_SUPPORTED = TCP_PROTOCOL_VERSION_12;
+    public static final int TCP_PROTOCOL_VERSION_MIN_SUPPORTED = TCP_PROTOCOL_VERSION_14;
 
     /**
      * Maximum supported version of TCP protocol.
      */
-    public static final int TCP_PROTOCOL_VERSION_MAX_SUPPORTED = TCP_PROTOCOL_VERSION_19;
+    public static final int TCP_PROTOCOL_VERSION_MAX_SUPPORTED = TCP_PROTOCOL_VERSION_20;
 
     /**
      * The major version of this database.

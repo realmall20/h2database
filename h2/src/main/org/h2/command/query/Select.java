@@ -148,7 +148,6 @@ public class Select extends Query {
     private boolean isForUpdate, isForUpdateMvcc;
     private double cost;
     private boolean isQuickAggregateQuery, isDistinctQuery;
-    private boolean isPrepared, checkInit;
     private boolean sortUsingIndex;
 
     private boolean isGroupWindowStage2;
@@ -941,7 +940,7 @@ public class Select extends Query {
                             e = new ExpressionColumn(database, replacementSchema, replacementAlias,
                                     replacementFilter.getColumnName(right), false);
                         } else {
-                            e = new Alias(Function.getFunctionWithArgs(database, Function.COALESCE,
+                            e = new Alias(Function.getFunctionWithArgs(Function.COALESCE,
                                     new ExpressionColumn(database, schema, alias, filter.getColumnName(left), false),
                                     new ExpressionColumn(database, replacementSchema, replacementAlias,
                                             replacementFilter.getColumnName(right), false)), //

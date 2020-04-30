@@ -32,7 +32,7 @@ public class TestConnectionPool extends TestDb {
      * @param a ignored
      */
     public static void main(String... a) throws Exception {
-        TestBase.createCaller().init().test();
+        TestBase.createCaller().init().testFromMain();
     }
 
     @Override
@@ -61,7 +61,7 @@ public class TestConnectionPool extends TestDb {
         conn1.close();
         conn2.createStatement().execute("shutdown immediately");
         cp.dispose();
-        assertTrue(w.toString().length() > 0);
+        assertTrue(w.toString().length() == 0);
         cp.dispose();
     }
 

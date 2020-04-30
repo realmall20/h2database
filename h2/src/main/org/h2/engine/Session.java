@@ -59,6 +59,8 @@ import org.h2.value.Value;
 import org.h2.value.ValueArray;
 import org.h2.value.ValueBigint;
 import org.h2.value.ValueLob;
+import org.h2.value.ValueLobDatabase;
+import org.h2.value.ValueLobInMemory;
 import org.h2.value.ValueNull;
 import org.h2.value.ValueTimestampTimeZone;
 import org.h2.value.ValueVarchar;
@@ -682,7 +684,7 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
         transactionStart = null;
         boolean forRepeatableRead = false;
         if (transaction != null) {
-            forRepeatableRead = !isolationLevel.allowNonRepeatableRead();
+            forRepeatableRead = !transaction.allowNonRepeatableRead();
             try {
                 markUsedTablesAsUpdated();
                 transaction.commit();
@@ -818,7 +820,6 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
         currentTransactionName = null;
         transactionStart = null;
         boolean needCommit = undoLog != null && undoLog.size() > 0 || transaction != null;
-        boolean forRepeatableRead = transaction != null && !isolationLevel.allowNonRepeatableRead();
         if (needCommit) {
             rollbackTo(null);
         }
@@ -831,7 +832,7 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
             autoCommit = true;
             autoCommitAtTransactionEnd = false;
         }
-        endTransaction(forRepeatableRead);
+        endTransaction(transaction != null && !transaction.allowNonRepeatableRead());
     }
 
     /**
@@ -927,14 +928,18 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
                 database.checkPowerOff();
 
                 // release any open table locks
-                rollback();
-
-                removeTemporaryLobs(false);
-                cleanTempTables(true);
-                commit(true);       // temp table removal may have opened new transaction
-                if (undoLog != null) {
-                    undoLog.clear();
+                if (hasPreparedTransaction()) {
+                    endTransaction(transaction != null && !transaction.allowNonRepeatableRead());
+                } else {
+                    rollback();
+                    removeTemporaryLobs(false);
+                    cleanTempTables(true);
+                    commit(true);       // temp table removal may have opened new transaction
+                    if (undoLog != null) {
+                        undoLog.clear();
+                    }
                 }
+
                 // Table#removeChildrenAndResources can take the meta lock,
                 // and we need to unlock before we call removeSession(), which might
                 // want to take the meta lock using the system session.
@@ -1017,9 +1022,6 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
     }
 
     private void unlockAll() {
-        if (undoLog != null && undoLog.size() > 0) {
-            throw DbException.throwInternalError();
-        }
         if (!locks.isEmpty()) {
             Table[] array = locks.toArray(new Table[0]);
             for (Table t : array) {
@@ -1268,14 +1270,23 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
     }
 
     /**
+     * Checks presence of prepared transaction in this session.
+     *
+     * @return {@code true} if there is a prepared transaction,
+     *         {@code false} otherwise
+     */
+    public boolean hasPreparedTransaction() {
+        return currentTransactionName != null;
+    }
+
+    /**
      * Commit or roll back the given transaction.
      *
      * @param transactionName the name of the transaction
      * @param commit true for commit, false for rollback
      */
     public void setPreparedTransaction(String transactionName, boolean commit) {
-        if (currentTransactionName != null &&
-                currentTransactionName.equals(transactionName)) {
+        if (hasPreparedTransaction() && currentTransactionName.equals(transactionName)) {
             if (commit) {
                 commit(false);
             } else {
@@ -1914,7 +1925,10 @@ public class Session extends SessionWithState implements TransactionStore.Rollba
 
     @Override
     public ValueLob addTemporaryLob(ValueLob v) {
-        int tableId = v.getTableId();
+        if (v instanceof ValueLobInMemory) {
+            return v;
+        }
+        int tableId = ((ValueLobDatabase) v).getTableId();
         if (tableId == LobStorageFrontend.TABLE_RESULT || tableId == LobStorageFrontend.TABLE_TEMP) {
             if (temporaryResultLobs == null) {
                 temporaryResultLobs = new LinkedList<>();

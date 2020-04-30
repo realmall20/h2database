@@ -10,7 +10,6 @@ import java.util.ArrayList;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
-
 import org.h2.api.DatabaseEventListener;
 import org.h2.api.ErrorCode;
 import org.h2.command.ddl.CreateTableData;
@@ -24,6 +23,7 @@ import org.h2.index.IndexType;
 import org.h2.message.DbException;
 import org.h2.message.Trace;
 import org.h2.mvstore.DataUtils;
+import org.h2.mvstore.MVStoreException;
 import org.h2.mvstore.db.MVTableEngine.Store;
 import org.h2.mvstore.tx.Transaction;
 import org.h2.mvstore.tx.TransactionStore;
@@ -216,16 +216,6 @@ public class MVTable extends RegularTable {
             }
             try {
                 traceLock(session, exclusive, TraceLockEvent.TRACE_LOCK_WAITING_FOR, NO_EXTRA_INFO);
-                if (database.getLockMode() == Constants.LOCK_MODE_TABLE_GC) {
-                    for (int i = 0; i < 20; i++) {
-                        long free = Runtime.getRuntime().freeMemory();
-                        System.gc();
-                        long free2 = Runtime.getRuntime().freeMemory();
-                        if (free == free2) {
-                            break;
-                        }
-                    }
-                }
                 // don't wait too long so that deadlocks are detected early
                 long sleep = Math.min(Constants.DEADLOCK_CHECK,
                         TimeUnit.NANOSECONDS.toMillis(max - now));
@@ -706,13 +696,13 @@ public class MVTable extends RegularTable {
     }
 
     /**
-     * Convert the illegal state exception to a database exception.
+     * Convert the MVStoreException to a database exception.
      *
      * @param e the illegal state exception
      * @return the database exception
      */
-    DbException convertException(IllegalStateException e) {
-        int errorCode = DataUtils.getErrorCode(e.getMessage());
+    DbException convertException(MVStoreException e) {
+        int errorCode = e.getErrorCode();
         if (errorCode == DataUtils.ERROR_TRANSACTION_LOCKED) {
             throw DbException.get(ErrorCode.CONCURRENT_UPDATE_1,
                     e, getName());
@@ -721,6 +711,6 @@ public class MVTable extends RegularTable {
             throw DbException.get(ErrorCode.DEADLOCK_1,
                     e, getName());
         }
-        return store.convertIllegalStateException(e);
+        return store.convertMVStoreException(e);
     }
 }

@@ -699,7 +699,7 @@ public class DataType {
                 if (session == null) {
                     String s = rs.getString(columnIndex);
                     v = s == null ? ValueNull.INSTANCE :
-                        ValueLob.createSmallLob(Value.CLOB, s.getBytes(StandardCharsets.UTF_8));
+                        ValueLobInMemory.createSmallLob(Value.CLOB, s.getBytes(StandardCharsets.UTF_8));
                 } else {
                     Reader in = rs.getCharacterStream(columnIndex);
                     if (in == null) {
@@ -714,7 +714,7 @@ public class DataType {
             case Value.BLOB: {
                 if (session == null) {
                     byte[] buff = rs.getBytes(columnIndex);
-                    return buff == null ? ValueNull.INSTANCE : ValueLob.createSmallLob(Value.BLOB, buff);
+                    return buff == null ? ValueNull.INSTANCE : ValueLobInMemory.createSmallLob(Value.BLOB, buff);
                 }
                 InputStream in = rs.getBinaryStream(columnIndex);
                 if (in == null) {
@@ -743,7 +743,7 @@ public class DataType {
                 for (int i = 0; i < len; i++) {
                     values[i] = DataType.convertToValue(session, list[i], Value.NULL);
                 }
-                v = ValueArray.get(values);
+                v = ValueArray.get(values, session);
                 break;
             }
             case Value.ENUM: {
@@ -1292,7 +1292,7 @@ public class DataType {
             for (int i = 0; i < len; i++) {
                 v[i] = convertToValue(session, o[i], type);
             }
-            return ValueArray.get(v);
+            return ValueArray.get(v, session);
         } else if (x instanceof Character) {
             return ValueChar.get(((Character) x).toString());
         } else if (isGeometry(x)) {
@@ -1463,11 +1463,8 @@ public class DataType {
             return t1 == t2;
         case Value.ARRAY:
             if (t2 == Value.ARRAY) {
-                ExtTypeInfo e1 = type1.getExtTypeInfo(), e2 = type2.getExtTypeInfo();
-                if (e1 != null && e2 != null) {
-                    return areStableComparable(
-                            ((ExtTypeInfoArray) e1).getComponentType(), ((ExtTypeInfoArray) e2).getComponentType());
-                }
+                return areStableComparable(((ExtTypeInfoArray) type1.getExtTypeInfo()).getComponentType(),
+                        ((ExtTypeInfoArray) type2.getExtTypeInfo()).getComponentType());
             }
             return false;
         default:
@@ -1542,7 +1539,7 @@ public class DataType {
      * @return true if the value type is a numeric type
      */
     public static boolean isNumericType(int type) {
-        return type >= Value.TINYINT && type <= Value.REAL;
+        return type >= Value.TINYINT && type <= Value.NUMERIC;
     }
 
     /**
@@ -1552,14 +1549,7 @@ public class DataType {
      * @return true if the value type is a binary string type
      */
     public static boolean isBinaryStringType(int type) {
-        switch (type) {
-        case Value.VARBINARY:
-        case Value.BINARY:
-        case Value.BLOB:
-            return true;
-        default:
-            return false;
-        }
+        return type >= Value.BINARY && type <= Value.BLOB;
     }
 
     /**
@@ -1569,15 +1559,7 @@ public class DataType {
      * @return true if the value type is a character string type
      */
     public static boolean isCharacterStringType(int type) {
-        switch (type) {
-        case Value.VARCHAR:
-        case Value.VARCHAR_IGNORECASE:
-        case Value.CLOB:
-        case Value.CHAR:
-            return true;
-        default:
-            return false;
-        }
+        return type >= Value.CHAR && type <= Value.VARCHAR_IGNORECASE;
     }
 
     /**
@@ -1588,16 +1570,6 @@ public class DataType {
      */
     public static boolean isStringType(int type) {
         return type == Value.VARCHAR || type == Value.CHAR || type == Value.VARCHAR_IGNORECASE;
-    }
-
-    /**
-     * Check if the given type may have extended type information.
-     *
-     * @param type the value type
-     * @return true if the value type may have extended type information
-     */
-    public static boolean isExtInfoType(int type) {
-        return type == Value.GEOMETRY || type == Value.ENUM;
     }
 
     /**

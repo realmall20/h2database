@@ -72,7 +72,7 @@ public class TestScript extends TestDb {
     private PrintStream out;
     private final ArrayList<String[]> result = new ArrayList<>();
     private final ArrayDeque<String> putBack = new ArrayDeque<>();
-    private StringBuilder errors;
+    private boolean foundErrors;
 
     private Random random = new Random(1);
 
@@ -94,7 +94,7 @@ public class TestScript extends TestDb {
      */
     public static void main(String... a) throws Exception {
         CHECK_ORDERING = true;
-        TestBase.createCaller().init().test();
+        TestBase.createCaller().init().testFromMain();
     }
 
     /**
@@ -167,7 +167,7 @@ public class TestScript extends TestDb {
                 "merge", "mergeUsing", "replace", "script", "show", "update", "with" }) {
             testScript("dml/" + s + ".sql");
         }
-        for (String s : new String[] { "any", "array-agg", "avg", "bit-and", "bit-or", "count", "envelope",
+        for (String s : new String[] { "any", "array-agg", "avg", "bit-and", "bit-or", "bit-xor", "count", "envelope",
                 "every", "histogram",
                 "json_arrayagg", "json_objectagg",
                 "listagg", "max", "min", "mode", "percentile", "rank",
@@ -186,7 +186,8 @@ public class TestScript extends TestDb {
                 "tan", "tanh", "truncate", "zero" }) {
             testScript("functions/numeric/" + s + ".sql");
         }
-        for (String s : new String[] { "ascii", "bit-length", "char", "concat",
+        for (String s : new String[] { "array-to-string",
+                "ascii", "bit-length", "char", "concat",
                 "concat-ws", "difference", "hextoraw", "insert", "instr",
                 "left", "length", "locate", "lower", "lpad", "ltrim",
                 "octet-length", "position", "quote_ident", "rawtohex", "regexp-like",
@@ -219,8 +220,8 @@ public class TestScript extends TestDb {
         for (String s : new String[] { "lead", "nth_value", "ntile", "ratio_to_report", "row_number" }) {
             testScript("functions/window/" + s + ".sql");
         }
-        for (String s : new String[] { "at-time-zone", "boolean-test", "conditions", "data-change-delta-table", "help",
-                "sequence", "set" }) {
+        for (String s : new String[] { "at-time-zone", "boolean-test", "case", "conditions", "data-change-delta-table",
+                "help", "sequence", "set" }) {
             testScript("other/" + s + ".sql");
         }
         for (String s : new String[] { "in", "like", "null", "type", "unique" }) {
@@ -233,6 +234,9 @@ public class TestScript extends TestDb {
 
         deleteDb("script");
         System.out.flush();
+        if (foundErrors) {
+            throw new Exception("errors in script found");
+        }
     }
 
     private void testScript(String scriptFileName) throws Exception {
@@ -247,11 +251,7 @@ public class TestScript extends TestDb {
         out = null;
         result.clear();
         putBack.clear();
-        errors = null;
 
-        if (statements == null) {
-            println("Running commands in " + scriptFileName);
-        }
         String outFile;
         if (FIX_OUTPUT) {
             outFile = scriptFileName;
@@ -265,7 +265,6 @@ public class TestScript extends TestDb {
         conn = getConnection("script");
         stat = conn.createStatement();
         out = new PrintStream(new FileOutputStream(outFile));
-        errors = new StringBuilder();
         testFile(BASE_DIR + scriptFileName);
         conn.close();
         out.close();
@@ -290,9 +289,6 @@ public class TestScript extends TestDb {
             }
             file.renameTo(new File("h2/src/test/org/h2/test/scripts/" + scriptFileName));
             return;
-        }
-        if (errors.length() > 0) {
-            throw new Exception("errors in " + scriptFileName + " found");
         }
     }
 
@@ -769,12 +765,12 @@ public class TestScript extends TestDb {
     }
 
     private void addWriteResultError(String expected, String got) {
-        int idx = errors.length();
-        errors.append(fileName).append('\n');
-        errors.append("line: ").append(in.getLineNumber()).append('\n');
-        errors.append("exp: ").append(expected).append('\n');
-        errors.append("got: ").append(got).append('\n');
-        TestBase.logErrorMessage(errors.substring(idx));
+        foundErrors = true;
+        final String msg = fileName + '\n' + //
+                "line: " + in.getLineNumber() + '\n' + //
+                "exp: " + expected + '\n' + //
+                "got: " + got + '\n';
+        TestBase.logErrorMessage(msg);
     }
 
     private void write(String s) {

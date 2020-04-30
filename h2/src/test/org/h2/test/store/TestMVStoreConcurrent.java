@@ -19,11 +19,11 @@ import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.atomic.AtomicInteger;
-
 import org.h2.mvstore.Chunk;
 import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
+import org.h2.mvstore.MVStoreException;
 import org.h2.mvstore.WriteBuffer;
 import org.h2.mvstore.type.ObjectDataType;
 import org.h2.store.fs.FileChannelInputStream;
@@ -34,7 +34,7 @@ import org.h2.util.Task;
 /**
  * Tests concurrently accessing a tree map store.
  */
-public class TestConcurrent extends TestMVStore {
+public class TestMVStoreConcurrent extends TestMVStore {
 
     /**
      * Run just this test.
@@ -42,7 +42,7 @@ public class TestConcurrent extends TestMVStore {
      * @param a ignored
      */
     public static void main(String... a) throws Exception {
-        TestBase.createCaller().init().test();
+        TestBase.createCaller().init().testFromMain();
     }
 
     @Override
@@ -435,13 +435,13 @@ public class TestConcurrent extends TestMVStore {
                 m.put(2, 2);
                 s.commit();
 
-                MVMap<String, String> meta = s.getMetaMap();
+                MVMap<String, String> layoutMap = s.getLayoutMap();
                 int chunkCount = 0;
-                for (String k : meta.keyList()) {
+                for (String k : layoutMap.keyList()) {
                     if (k.startsWith(DataUtils.META_CHUNK)) {
                         // dead chunks may stay around for a little while
                         // discount them
-                        Chunk chunk = Chunk.fromString(meta.get(k));
+                        Chunk chunk = Chunk.fromString(layoutMap.get(k));
                         if (chunk.maxLenLive > 0) {
                             chunkCount++;
                         }
@@ -515,13 +515,12 @@ public class TestConcurrent extends TestMVStore {
                     Exception e = task.getException();
                     if (e != null) {
                         assertEquals(DataUtils.ERROR_CLOSED,
-                                        DataUtils.getErrorCode(e.getMessage()));
+                                ((MVStoreException) e).getErrorCode());
                     }
-                } catch (IllegalStateException e) {
+                } catch (MVStoreException e) {
                     // sometimes storing works, in which case
                     // closing must fail
-                    assertEquals(DataUtils.ERROR_WRITING_FAILED,
-                            DataUtils.getErrorCode(e.getMessage()));
+                    assertEquals(DataUtils.ERROR_WRITING_FAILED, e.getErrorCode());
                     task.get();
                 }
             }

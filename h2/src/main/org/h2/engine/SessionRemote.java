@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.net.Socket;
 import java.sql.SQLException;
 import java.util.ArrayList;
-
 import org.h2.api.DatabaseEventListener;
 import org.h2.api.ErrorCode;
 import org.h2.api.JavaObjectSerializer;
@@ -26,7 +25,6 @@ import org.h2.result.ResultInterface;
 import org.h2.store.DataHandler;
 import org.h2.store.FileStore;
 import org.h2.store.LobStorageFrontend;
-import org.h2.store.LobStorageInterface;
 import org.h2.store.fs.FileUtils;
 import org.h2.util.DateTimeUtils;
 import org.h2.util.JdbcUtils;
@@ -145,10 +143,8 @@ public class SessionRemote extends SessionWithState implements DataHandler {
             done(trans);
             clientVersion = trans.readInt();
             trans.setVersion(clientVersion);
-            if (clientVersion >= Constants.TCP_PROTOCOL_VERSION_14) {
-                if (ci.getFileEncryptionKey() != null) {
-                    trans.writeBytes(ci.getFileEncryptionKey());
-                }
+            if (ci.getFileEncryptionKey() != null) {
+                trans.writeBytes(ci.getFileEncryptionKey());
             }
             trans.writeInt(SessionRemote.SESSION_SET_ID);
             trans.writeString(sessionId);
@@ -734,7 +730,7 @@ public class SessionRemote extends SessionWithState implements DataHandler {
     }
 
     @Override
-    public LobStorageInterface getLobStorage() {
+    public LobStorageFrontend getLobStorage() {
         if (lobStorage == null) {
             lobStorage = new LobStorageFrontend(this);
         }

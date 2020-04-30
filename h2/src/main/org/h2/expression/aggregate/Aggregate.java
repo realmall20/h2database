@@ -40,6 +40,7 @@ import org.h2.table.Table;
 import org.h2.table.TableFilter;
 import org.h2.value.CompareMode;
 import org.h2.value.DataType;
+import org.h2.value.ExtTypeInfoArray;
 import org.h2.value.TypeInfo;
 import org.h2.value.Value;
 import org.h2.value.ValueArray;
@@ -119,6 +120,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         addAggregate("HISTOGRAM", AggregateType.HISTOGRAM);
         addAggregate("BIT_OR", AggregateType.BIT_OR);
         addAggregate("BIT_AND", AggregateType.BIT_AND);
+        addAggregate("BIT_XOR", AggregateType.BIT_XOR);
 
         addAggregate("RANK", AggregateType.RANK);
         addAggregate("DENSE_RANK", AggregateType.DENSE_RANK);
@@ -413,6 +415,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         case STDDEV_SAMP:
         case VAR_POP:
         case VAR_SAMP:
+        case BIT_XOR:
             if (distinct) {
                 AggregateDataCollecting c = ((AggregateDataCollecting) data);
                 if (c.getCount() == 0) {
@@ -442,7 +445,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
                     array[i] = ((ValueRow) array[i]).getList()[0];
                 }
             }
-            return ValueArray.get(array);
+            return ValueArray.get(array, session);
         }
         case RANK:
         case DENSE_RANK:
@@ -632,7 +635,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
         Database db = session.getDatabase();
         CompareMode compareMode = db.getCompareMode();
         Arrays.sort(values, (v1, v2) -> v1.getList()[0].compareTo(v2.getList()[0], session, compareMode));
-        return ValueArray.get(values);
+        return ValueArray.get(values, session);
     }
 
     private Value getMode(Session session, AggregateData data) {
@@ -738,7 +741,7 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
             type = TypeInfo.TYPE_BIGINT;
             break;
         case HISTOGRAM:
-            type = TypeInfo.TYPE_ARRAY;
+            type = TypeInfo.getTypeInfo(Value.ARRAY, -1, 0, new ExtTypeInfoArray(TypeInfo.TYPE_ROW));
             break;
         case SUM: {
             int dataType = type.getValueType();
@@ -800,12 +803,13 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
             break;
         case BIT_AND:
         case BIT_OR:
+        case BIT_XOR:
             if (!DataType.supportsAdd(type.getValueType())) {
                 throw DbException.get(ErrorCode.SUM_OR_AVG_ON_WRONG_DATATYPE_1, getTraceSQL());
             }
             break;
         case ARRAY_AGG:
-            type = TypeInfo.TYPE_ARRAY;
+            type = TypeInfo.getTypeInfo(Value.ARRAY, -1, 0, new ExtTypeInfoArray(args[0].getType()));
             break;
         case ENVELOPE:
             type = TypeInfo.TYPE_GEOMETRY;
@@ -877,6 +881,9 @@ public class Aggregate extends AbstractAggregate implements ExpressionWithFlags 
             break;
         case BIT_OR:
             text = "BIT_OR";
+            break;
+        case BIT_XOR:
+            text = "BIT_XOR";
             break;
         case RANK:
             text = "RANK";

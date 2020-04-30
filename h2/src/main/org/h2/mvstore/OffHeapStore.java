@@ -34,7 +34,7 @@ public class OffHeapStore extends FileStore {
     public ByteBuffer readFully(long pos, int len) {
         Entry<Long, ByteBuffer> memEntry = memory.floorEntry(pos);
         if (memEntry == null) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_READING_FAILED,
                     "Could not read from position {0}", pos);
         }
@@ -55,7 +55,7 @@ public class OffHeapStore extends FileStore {
         if (buff == null) {
             // nothing was written (just allocated)
         } else if (buff.remaining() != length) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_READING_FAILED,
                     "Partial remove is not supported at position {0}", pos);
         }
@@ -76,7 +76,7 @@ public class OffHeapStore extends FileStore {
         int length = src.remaining();
         if (prevPos == pos) {
             if (prevLength != length) {
-                throw DataUtils.newIllegalStateException(
+                throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_READING_FAILED,
                         "Could not write to position {0}; " +
                         "partial overwrite is not supported", pos);
@@ -88,7 +88,7 @@ public class OffHeapStore extends FileStore {
             return;
         }
         if (prevPos + prevLength > pos) {
-            throw DataUtils.newIllegalStateException(
+            throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_READING_FAILED,
                     "Could not write to position {0}; " +
                     "partial overwrite is not supported", pos);
@@ -122,7 +122,7 @@ public class OffHeapStore extends FileStore {
             }
             ByteBuffer buff = memory.get(pos);
             if (buff.capacity() > size) {
-                throw DataUtils.newIllegalStateException(
+                throw DataUtils.newMVStoreException(
                         DataUtils.ERROR_READING_FAILED,
                         "Could not truncate to {0}; " +
                         "partial truncate is not supported", pos);
