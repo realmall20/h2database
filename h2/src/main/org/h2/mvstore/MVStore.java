@@ -1386,7 +1386,13 @@ public class MVStore implements AutoCloseable {
 
     private void storeNow(long reservedLow, long reservedHigh) {
         long time = getTimeSinceCreation();
+        /**
+         * 当前没有保存的页数据
+         */
         int currentUnsavedPageCount = unsavedMemory;
+        /**
+         * 当前保存的版本号
+         */
         long storeVersion = currentStoreVersion;
         // it is ok, since that path suppose to be single-threaded under storeLock
         //noinspection NonAtomicOperationOnVolatileField
@@ -1433,6 +1439,7 @@ public class MVStore implements AutoCloseable {
         c.next = Long.MAX_VALUE;
         c.occupancy = new BitSet();
         chunks.put(c.id, c);
+        //收集保存的版本号和当前版本号之间的所有节点数据
         ArrayList<Page<?, ?>> changed = collectChangedMapRoots(storeVersion, version);
         List<Long> toc = new ArrayList<>();
         WriteBuffer buff = getWriteBuffer();

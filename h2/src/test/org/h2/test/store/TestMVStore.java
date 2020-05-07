@@ -172,6 +172,9 @@ public class TestMVStore extends TestBase {
         assertEquals(0, openClose.get());
     }
 
+    /**
+     * 测试不持久化
+     */
     private void testVolatileMap() {
         String fileName = getBaseDir() + "/" + getTestName();
         FileUtils.delete(fileName);

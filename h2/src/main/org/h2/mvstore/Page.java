@@ -563,6 +563,7 @@ public abstract class Page<K, V> implements Cloneable {
         if (index == keyCount) {
             --index;
         }
+        //是否持久化
         if (isPersistent()) {
             K old = getKey(index);
             //计算key使用内存

@@ -811,6 +811,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
 
     /**
      * 是否是持久化
+     *
      * @return
      */
     protected final boolean isPersistent() {
@@ -1869,7 +1870,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                             p.insertLeaf(-index - 1, key, value);
                             int keyCount;
                             /**
-                             * 这段逻辑其实是分裂子节点
+                             * 这段逻辑其实是insert 之后的分裂子节点
                              */
                             while ((keyCount = p.getKeyCount()) > store.getKeysPerPage()
                                     || p.getMemory() > store.getMaxPageSize()
@@ -1902,6 +1903,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                         break;
                     }
                 }
+                //替换整个树
                 rootPage = replacePage(pos, p, unsavedMemoryHolder);
                 if (!locked) {
                     rootReference = rootReference.updateRootPage(rootPage, attempt);
