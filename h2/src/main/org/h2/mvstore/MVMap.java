@@ -1845,6 +1845,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                         }
                         //TODO 为什么要拷贝一份数据，目的何在？
                         p = p.copy();
+                        //TODO 删除操作为什么没有涉及中间节点的key替换,这段逻辑放在了哪里？
                         p.remove(index);
                         break;
                     }

@@ -553,7 +553,7 @@ public abstract class Page<K,V> implements Cloneable
 
     /**
      * Remove the key and value (or child) at the given index.
-     *
+     * 这一块只是简简单单的移除数据？
      * @param index the index
      */
     public void remove(int index) {
