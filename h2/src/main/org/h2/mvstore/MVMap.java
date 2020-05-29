@@ -1868,6 +1868,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                                 Page<K,V> split = p.split(at);
                                 unsavedMemoryHolder.value += p.getMemory() + split.getMemory();
                                 if (pos == null) {
+                                    //创建一个空数组
                                     K[] keys = p.createKeyStorage(1);
                                     keys[0] = k;
                                     Page.PageReference<K,V>[] children = Page.createRefStorage(2);
