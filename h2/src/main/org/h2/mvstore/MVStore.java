@@ -6,6 +6,7 @@
 package org.h2.mvstore;
 
 import static org.h2.mvstore.MVMap.INITIAL_VERSION;
+
 import java.lang.Thread.UncaughtExceptionHandler;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +42,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+
 import org.h2.compress.CompressDeflate;
 import org.h2.compress.CompressLZF;
 import org.h2.compress.Compressor;
@@ -140,8 +142,7 @@ MVStore:
 /**
  * A persistent storage for maps.
  */
-public class MVStore implements AutoCloseable
-{
+public class MVStore implements AutoCloseable {
     // The following are attribute names (keys) in store header map
     private static final String HDR_H = "H";
     private static final String HDR_BLOCK_SIZE = "blockSize";
@@ -265,7 +266,7 @@ public class MVStore implements AutoCloseable
 
     /**
      * The metadata map. Write access to this map needs to be done under storeLock.
-     *
+     * <p>
      * The layout map. Contains chunks metadata and root locations for all maps.
      * This is relatively fast changing part of metadata
      */
@@ -372,8 +373,8 @@ public class MVStore implements AutoCloseable
      * Create and open the store.
      *
      * @param config the configuration to use
-     * @throws MVStoreException if the file is corrupt, or an exception
-     *             occurred while opening
+     * @throws MVStoreException         if the file is corrupt, or an exception
+     *                                  occurred while opening
      * @throws IllegalArgumentException if the directory does not exist
      */
     MVStore(Map<String, Object> config) {
@@ -383,7 +384,7 @@ public class MVStore implements AutoCloseable
         String fileName = (String) config.get("fileName");
         FileStore fileStore = (FileStore) config.get("fileStore");
         fileStoreIsProvided = fileStore != null;
-        if(fileStore == null && fileName != null) {
+        if (fileStore == null && fileName != null) {
             fileStore = new FileStore();
         }
         this.fileStore = fileStore;
@@ -480,7 +481,7 @@ public class MVStore implements AutoCloseable
         onVersionChange(currentVersion);
     }
 
-    private MVMap<String,String> openMetaMap() {
+    private MVMap<String, String> openMetaMap() {
         String metaIdStr = layout.get(META_ID_KEY);
         int metaId;
         if (metaIdStr == null) {
@@ -489,7 +490,7 @@ public class MVStore implements AutoCloseable
         } else {
             metaId = DataUtils.parseHexInt(metaIdStr);
         }
-        MVMap<String,String> map = new MVMap<>(this, metaId, StringDataType.INSTANCE, StringDataType.INSTANCE);
+        MVMap<String, String> map = new MVMap<>(this, metaId, StringDataType.INSTANCE, StringDataType.INSTANCE);
         map.setRootPos(getRootPos(map.getId()), currentVersion - 1);
         return map;
     }
@@ -498,7 +499,7 @@ public class MVStore implements AutoCloseable
         Set<String> keysToRemove = new HashSet<>();
 
         // split meta map off layout map
-        for (String prefix : new String[]{ DataUtils.META_NAME, DataUtils.META_MAP }) {
+        for (String prefix : new String[]{DataUtils.META_NAME, DataUtils.META_MAP}) {
             for (Iterator<String> it = layout.keyIterator(prefix); it.hasNext(); ) {
                 String key = it.next();
                 if (!key.startsWith(prefix)) {
@@ -511,13 +512,13 @@ public class MVStore implements AutoCloseable
         }
 
         // remove roots of non-existent maps (leftover after unfinished map removal)
-        for (Iterator<String> it = layout.keyIterator(DataUtils.META_ROOT); it.hasNext();) {
+        for (Iterator<String> it = layout.keyIterator(DataUtils.META_ROOT); it.hasNext(); ) {
             String key = it.next();
             if (!key.startsWith(DataUtils.META_ROOT)) {
                 break;
             }
             String mapIdStr = key.substring(key.lastIndexOf('.') + 1);
-            if(!meta.containsKey(DataUtils.META_MAP + mapIdStr) && DataUtils.parseHexInt(mapIdStr) != meta.getId()) {
+            if (!meta.containsKey(DataUtils.META_MAP + mapIdStr) && DataUtils.parseHexInt(mapIdStr) != meta.getId()) {
                 keysToRemove.add(key);
             }
         }
@@ -607,8 +608,8 @@ public class MVStore implements AutoCloseable
      * it does not yet exist. If a map with this name is already open, this map
      * is returned.
      *
-     * @param <K> the key type
-     * @param <V> the value type
+     * @param <K>  the key type
+     * @param <V>  the value type
      * @param name the name of the map
      * @return the map
      */
@@ -621,10 +622,11 @@ public class MVStore implements AutoCloseable
      * does not yet exist. If a map with this name is already open, this map is
      * returned.
      * 非线程安全。
-     * @param <M> the map type
-     * @param <K> the key type
-     * @param <V> the value type
-     * @param name the name of the map
+     *
+     * @param <M>     the map type
+     * @param <K>     the key type
+     * @param <V>     the value type
+     * @param name    the name of the map
      * @param builder the map builder
      * @return the map
      */
@@ -633,7 +635,7 @@ public class MVStore implements AutoCloseable
         if (id >= 0) { // map已经存在
             @SuppressWarnings("unchecked")
             M map = (M) getMap(id);
-            if(map == null) {
+            if (map == null) {
                 map = openMap(id, builder);
             }
             assert builder.getKeyType() == null || map.getKeyType().getClass().equals(builder.getKeyType().getClass());
@@ -663,6 +665,7 @@ public class MVStore implements AutoCloseable
     }
 
     public <M extends MVMap<K, V>, K, V> M openMap(int id, MVMap.MapBuilder<M, K, V> builder) {
+        //从某种意义上其实就是建表，所以需要加锁
         storeLock.lock();
         try {
             @SuppressWarnings("unchecked")
@@ -858,8 +861,8 @@ public class MVStore implements AutoCloseable
             throw DataUtils.newMVStoreException(
                     DataUtils.ERROR_UNSUPPORTED_FORMAT,
                     "The write format {0} is larger " +
-                    "than the supported format {1}, " +
-                    "and the file was not opened in read-only mode",
+                            "than the supported format {1}, " +
+                            "and the file was not opened in read-only mode",
                     format, FORMAT_WRITE);
         }
         format = DataUtils.readHexLong(storeHeader, HDR_FORMAT_READ, format);
@@ -963,7 +966,7 @@ public class MVStore implements AutoCloseable
                         validChunksByLocation.put(test.block, test);
                     }
                 }
-            } catch(MVStoreException ignored) {
+            } catch (MVStoreException ignored) {
                 assumeCleanShutdown = false;
             }
         }
@@ -1432,10 +1435,11 @@ public class MVStore implements AutoCloseable
         // because meta map is modified within storeNow() and that
         // causes beforeWrite() call with possibility of going back here
         // 查看锁是否被挂起 ，当前需要保存的版本小于0（没有线程在执行提交操作）
-        if(!storeLock.isHeldByCurrentThread() || currentStoreVersion < 0) {
+        if (!storeLock.isHeldByCurrentThread() || currentStoreVersion < 0) {
             storeLock.lock();
             try {
                 if (check.test(this)) {
+                    //提交一次，才修改版本
                     store(true);
                 }
             } finally {
@@ -1482,11 +1486,11 @@ public class MVStore implements AutoCloseable
             // it is ok, since that path suppose to be single-threaded under storeLock
             //noinspection NonAtomicOperationOnVolatileField
             long version = ++currentVersion;
-            ArrayList<Page<?,?>> changed = collectChangedMapRoots(version);
+            ArrayList<Page<?, ?>> changed = collectChangedMapRoots(version);
 
             submitOrRun(serializationExecutor,
                     () -> serializeAndStore(syncWrite, reservedLow, reservedHighSupplier,
-                                            changed, lastCommitTime, version),
+                            changed, lastCommitTime, version),
                     syncWrite);
 
             // some pages might have been changed in the meantime (in the newest
@@ -1520,19 +1524,19 @@ public class MVStore implements AutoCloseable
         action.run();
     }
 
-    private ArrayList<Page<?,?>> collectChangedMapRoots(long version) {
+    private ArrayList<Page<?, ?>> collectChangedMapRoots(long version) {
         long lastStoredVersion = version - 2;
-        ArrayList<Page<?,?>> changed = new ArrayList<>();
+        ArrayList<Page<?, ?>> changed = new ArrayList<>();
         for (Iterator<MVMap<?, ?>> iter = maps.values().iterator(); iter.hasNext(); ) {
             MVMap<?, ?> map = iter.next();
-            RootReference<?,?> rootReference = map.setWriteVersion(version);
+            RootReference<?, ?> rootReference = map.setWriteVersion(version);
             if (rootReference == null) {
                 iter.remove();
             } else if (map.getCreateVersion() < version && // if map was created after storing started, skip it
                     !map.isVolatile() &&
                     map.hasChangesSince(lastStoredVersion)) {
                 assert rootReference.version <= version : rootReference.version + " > " + version;
-                Page<?,?> rootPage = rootReference.root;
+                Page<?, ?> rootPage = rootReference.root;
                 if (!rootPage.isSaved() ||
                         // after deletion previously saved leaf
                         // may pop up as a root, but we still need
@@ -1542,7 +1546,7 @@ public class MVStore implements AutoCloseable
                 }
             }
         }
-        RootReference<?,?> rootReference = meta.setWriteVersion(version);
+        RootReference<?, ?> rootReference = meta.setWriteVersion(version);
         if (meta.hasChangesSince(lastStoredVersion) || metaChanged) {
             assert rootReference != null && rootReference.version <= version
                     : rootReference == null ? "null" : rootReference.version + " > " + version;
@@ -1559,7 +1563,7 @@ public class MVStore implements AutoCloseable
     }
 
     private void serializeAndStore(boolean syncRun, long reservedLow, Supplier<Long> reservedHighSupplier,
-                                    ArrayList<Page<?,?>> changed, long time, long version) {
+                                   ArrayList<Page<?, ?>> changed, long time, long version) {
         serializationLock.lock();
         try {
             Chunk c = createChunk(time, version);
@@ -1585,7 +1589,7 @@ public class MVStore implements AutoCloseable
             Chunk lastChunk = chunks.get(chunkId);
             assert lastChunk != null;
             assert lastChunk.isSaved();
-            assert lastChunk.version + 1 == version : lastChunk.version + " " +  version;
+            assert lastChunk.version + 1 == version : lastChunk.version + " " + version;
             // the metadata of the last chunk was not stored so far, and needs to be
             // set now (it's better not to update right after storing, because that
             // would modify the meta map again)
@@ -1623,7 +1627,7 @@ public class MVStore implements AutoCloseable
     }
 
     private void serializeToBuffer(WriteBuffer buff, ArrayList<Page<?, ?>> changed, Chunk c,
-                                    long reservedLow, Supplier<Long> reservedHighSupplier) {
+                                   long reservedLow, Supplier<Long> reservedHighSupplier) {
         // need to patch the header later
         c.writeChunkHeader(buff, 0);
         int headerLength = buff.position() + 44;
@@ -1631,7 +1635,7 @@ public class MVStore implements AutoCloseable
 
         long version = c.version;
         List<Long> toc = new ArrayList<>();
-        for (Page<?,?> p : changed) {
+        for (Page<?, ?> p : changed) {
             String key = MVMap.getMapRootKey(p.getMapId());
             if (p.getTotalCount() == 0) {
                 layout.remove(key);
@@ -1644,7 +1648,7 @@ public class MVStore implements AutoCloseable
 
         acceptChunkOccupancyChanges(c.time, version);
 
-        RootReference<String,String> layoutRootReference = layout.setWriteVersion(version);
+        RootReference<String, String> layoutRootReference = layout.setWriteVersion(version);
         assert layoutRootReference != null;
         assert layoutRootReference.version == version : layoutRootReference.version + " != " + version;
         metaChanged = false;
@@ -1653,7 +1657,7 @@ public class MVStore implements AutoCloseable
 
         onVersionChange(version);
 
-        Page<String,String> layoutRoot = layoutRootReference.root;
+        Page<String, String> layoutRoot = layoutRootReference.root;
         layoutRoot.writeUnsavedRecursive(c, buff, toc);
         c.layoutRootPos = layoutRoot.getPos();
         changed.add(layoutRoot);
@@ -1712,7 +1716,7 @@ public class MVStore implements AutoCloseable
         }
     }
 
-    private void storeBuffer(Chunk c, WriteBuffer buff, ArrayList<Page<?,?>> changed) {
+    private void storeBuffer(Chunk c, WriteBuffer buff, ArrayList<Page<?, ?>> changed) {
         saveChunkLock.lock();
         try {
             buff.position(0);
@@ -1872,6 +1876,7 @@ public class MVStore implements AutoCloseable
      * Shrink the file if possible, and if at least a given percentage can be
      * saved.
      * 压缩文件 ，
+     *
      * @param minPercent the minimum percentage to save
      */
     private void shrinkFileIfPossible(int minPercent) {
@@ -1956,6 +1961,7 @@ public class MVStore implements AutoCloseable
 
     /**
      * 获取块头
+     *
      * @param block
      * @return
      */
@@ -1993,18 +1999,20 @@ public class MVStore implements AutoCloseable
      * overwriting chunks and before resizing the file, syncFile() is called.
      *
      * @param targetFillRate do nothing if the file store fill rate is higher
-     *            than this
-     * @param moveSize the number of bytes to move
+     *                       than this
+     * @param moveSize       the number of bytes to move
      */
     boolean compactMoveChunks(int targetFillRate, long moveSize) {
         boolean res = false;
         storeLock.lock();
         try {
             checkOpen();
-            submitOrRun(serializationExecutor, () -> {}, true);
+            submitOrRun(serializationExecutor, () -> {
+            }, true);
             serializationLock.lock();
             try {
-                submitOrRun(bufferSaveExecutor, () -> {}, true);
+                submitOrRun(bufferSaveExecutor, () -> {
+                }, true);
                 saveChunkLock.lock();
                 try {
                     if (lastChunk != null && reuseSpace && getFillRate() <= targetFillRate) {
@@ -2078,7 +2086,7 @@ public class MVStore implements AutoCloseable
     }
 
     private int getMovePriority(Chunk chunk) {
-        return fileStore.getMovePriority((int)chunk.block);
+        return fileStore.getMovePriority((int) chunk.block);
     }
 
     private void compactMoveChunks(Iterable<Chunk> move) {
@@ -2136,7 +2144,7 @@ public class MVStore implements AutoCloseable
                 // used, lets try to move that chunk into this area, closer to
                 // the beginning of the file
                 long lastBoundary = moved || chunkToMoveIsAlreadyInside ?
-                                        postEvacuationBlockCount : chunkToMove.block;
+                        postEvacuationBlockCount : chunkToMove.block;
                 moved = !moved && moveChunkInside(chunkToMove, lastBoundary);
                 if (moveChunkInside(lastChunk, lastBoundary) || moved) {
                     store(lastBoundary, -1);
@@ -2175,8 +2183,8 @@ public class MVStore implements AutoCloseable
      * specifies file interval to be avoided, when un-allocated space will be
      * chosen for a new chunk's location.
      *
-     * @param chunk to move
-     * @param reservedAreaLow low boundary of reserved area, inclusive
+     * @param chunk            to move
+     * @param reservedAreaLow  low boundary of reserved area, inclusive
      * @param reservedAreaHigh high boundary of reserved area, exclusive
      * @return true if block was moved, false otherwise
      */
@@ -2194,7 +2202,7 @@ public class MVStore implements AutoCloseable
         try {
             buff.limit(length);
             ByteBuffer readBuff = fileStore.readFully(start, length);
-        //获取块头
+            //获取块头
             Chunk chunkFromFile = Chunk.readChunkHeader(readBuff, start);
             int chunkHeaderLen = readBuff.position();
             buff.position(chunkHeaderLen);
@@ -2581,15 +2589,16 @@ public class MVStore implements AutoCloseable
 
     @SuppressWarnings("unchecked")
     private <K, V> Page<K, V> readPageFromCache(long pos) {
-        return cache == null ? null : (Page<K,V>)cache.get(pos);
+        return cache == null ? null : (Page<K, V>) cache.get(pos);
     }
 
     /**
      * Remove a page.
-     *  @param pos the position of the page
+     *
+     * @param pos     the position of the page
      * @param version at which page was removed
-     * @param pinned whether page is considered pinned
-     * @param pageNo sequential page number within chunk
+     * @param pinned  whether page is considered pinned
+     * @param pageNo  sequential page number within chunk
      */
     void accountForRemovedPage(long pos, long version, boolean pinned, int pageNo) {
         assert DataUtils.isPageSaved(pos);
@@ -2760,6 +2769,7 @@ public class MVStore implements AutoCloseable
         Chunk chunk = lastChunk;
         return chunk == null ? INITIAL_VERSION + 1 : chunk.version;
     }
+
     /**
      * Check whether all data can be read from this version. This requires that
      * all chunks referenced by this version are still available (not
@@ -2785,7 +2795,7 @@ public class MVStore implements AutoCloseable
         // need to be available in the file
         MVMap<String, String> oldLayoutMap = getLayoutMap(version);
         try {
-            for (Iterator<String> it = oldLayoutMap.keyIterator(DataUtils.META_CHUNK); it.hasNext();) {
+            for (Iterator<String> it = oldLayoutMap.keyIterator(DataUtils.META_CHUNK); it.hasNext(); ) {
                 String chunkKey = it.next();
                 if (!chunkKey.startsWith(DataUtils.META_CHUNK)) {
                     break;
@@ -3111,6 +3121,7 @@ public class MVStore implements AutoCloseable
     /**
      * Remove a map from the current version of the store.
      * 线程安全，是同一个线程里面的操作？
+     *
      * @param map the map to remove
      */
     public void removeMap(MVMap<?, ?> map) {
@@ -3119,12 +3130,14 @@ public class MVStore implements AutoCloseable
             checkOpen();
             DataUtils.checkArgument(layout != meta && map != meta,
                     "Removing the meta map is not allowed");
+            //清空 Map 里面的数据
             RootReference<?, ?> rootReference = map.clearIt();
             map.close();
             updateCounter += rootReference.updateCounter;
             updateAttemptCounter += rootReference.updateAttemptCounter;
             int id = map.getId();
             String name = getMapName(id);
+            //从元数据里面清除数据
             if (meta.remove(MVMap.getMapKey(id)) != null) {
                 //删除数据
                 markMetaChanged();
@@ -3329,6 +3342,7 @@ public class MVStore implements AutoCloseable
 
     /**
      * Determine that store is open, or wait for it to be closed (by other thread)
+     *
      * @return true if store is open, false otherwise
      */
     public boolean isClosed() {
@@ -3414,12 +3428,12 @@ public class MVStore implements AutoCloseable
 
     private static ThreadPoolExecutor createSingleThreadExecutor(String threadName) {
         return new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS,
-                                        new LinkedBlockingQueue<>(),
-                                        r -> {
-                                            Thread thread = new Thread(r, threadName);
-                                            thread.setDaemon(true);
-                                            return thread;
-                                        });
+                new LinkedBlockingQueue<>(),
+                r -> {
+                    Thread thread = new Thread(r, threadName);
+                    thread.setDaemon(true);
+                    return thread;
+                });
     }
 
     public boolean isBackgroundThread() {
@@ -3459,9 +3473,10 @@ public class MVStore implements AutoCloseable
 
     /**
      * Put the page in the cache.
+     *
      * @param page the page
      */
-    void cachePage(Page<?,?> page) {
+    void cachePage(Page<?, ?> page) {
         if (cache != null) {
             cache.put(page.getPos(), page, page.getMemory());
         }
@@ -3500,7 +3515,7 @@ public class MVStore implements AutoCloseable
      *
      * @return the cache
      */
-    public CacheLongKeyLIRS<Page<?,?>> getCache() {
+    public CacheLongKeyLIRS<Page<?, ?>> getCache() {
         return cache;
     }
 
@@ -3536,7 +3551,7 @@ public class MVStore implements AutoCloseable
     public double getUpdateFailureRatio() {
         long updateCounter = this.updateCounter;
         long updateAttemptCounter = this.updateAttemptCounter;
-        RootReference<?,?> rootReference = layout.getRoot();
+        RootReference<?, ?> rootReference = layout.getRoot();
         updateCounter += rootReference.updateCounter;
         updateAttemptCounter += rootReference.updateAttemptCounter;
         rootReference = meta.getRoot();

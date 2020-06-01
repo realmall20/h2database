@@ -472,6 +472,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
      * @return the new root reference
      */
     RootReference<K,V> clearIt() {
+        //创建空的根节点
         Page<K,V> emptyRootPage = createEmptyLeaf();
         int attempt = 0;
         while (true) {
@@ -499,7 +500,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                         continue;
                     }
                 }
-                //TODO 这方法是干嘛的？
+                //重新计算内容使用量
                 store.registerUnsavedMemory(rootPage.removeAllRecursive(version));
                 rootPage = emptyRootPage;
                 return rootReference;
