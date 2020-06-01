@@ -651,7 +651,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
     }
 
     /**
-     * 设置根路径
+     * 回滚数据到某个版本 。
      * Set the position of the root page.
      * @param rootPos the position, 0 for empty
      * @param version to set for this map

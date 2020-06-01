@@ -269,6 +269,7 @@ public class MVStore implements AutoCloseable {
      * <p>
      * The layout map. Contains chunks metadata and root locations for all maps.
      * This is relatively fast changing part of metadata
+     * 包含块的元数据和所有map的根目录的位置
      */
     private final MVMap<String, String> layout;
 
@@ -2925,6 +2926,7 @@ public class MVStore implements AutoCloseable {
         try {
             checkOpen();
             if (version == 0) {
+                //版本是0 的时候，是清空库空间
                 // special case: remove all data
                 layout.setInitialRoot(layout.createEmptyLeaf(), INITIAL_VERSION);
                 meta.setInitialRoot(meta.createEmptyLeaf(), INITIAL_VERSION);
@@ -2959,8 +2961,9 @@ public class MVStore implements AutoCloseable {
                 versions.removeLast();
             }
             currentTxCounter = new TxCounter(version);
-
+            //chunk 数据回滚
             layout.rollbackTo(version);
+            //元数据回滚
             meta.rollbackTo(version);
             metaChanged = false;
             // find out which chunks to remove,
@@ -3024,11 +3027,13 @@ public class MVStore implements AutoCloseable {
             onVersionChange(currentVersion);
             for (MVMap<?, ?> m : new ArrayList<>(maps.values())) {
                 int id = m.getId();
+                //创建版本大于 当前版本，删除该版本数据
                 if (m.getCreateVersion() >= version) {
                     m.close();
                     maps.remove(id);
                 } else {
                     if (!m.rollbackRoot(version)) {
+                        //回滚数据
                         m.setRootPos(getRootPos(id), version - 1);
                     }
                 }
