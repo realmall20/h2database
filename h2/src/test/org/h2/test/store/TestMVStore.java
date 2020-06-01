@@ -124,10 +124,10 @@ public class TestMVStore extends TestBase {
              */
             MVMap<String, String> map = store.openMap("test");
             map.put("1", "Hello");
-            //commit的时候是保存到文件？
+            //commit的时候是保存到文件
             store.commit();
             store.removeMap(map);
-            //rollback 会持久化到文件中吗？
+            //rollback ，回滚到上个版本，RootReference 进行回滚
             store.rollback();
             assertTrue(store.hasMap("test"));
             //openMap其实没什么影响？打开的还是原先的map。

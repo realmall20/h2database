@@ -1893,6 +1893,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                 }
                 rootPage = replacePage(pos, p, unsavedMemoryHolder);
                 if (!locked) {
+                    //这一块是基于多线程的考虑是否替换根目录
                     rootReference = rootReference.updateRootPage(rootPage, attempt);
                     if (rootReference == null) {
                         decisionMaker.reset();
