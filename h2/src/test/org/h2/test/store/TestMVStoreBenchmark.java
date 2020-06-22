@@ -18,6 +18,7 @@ import org.h2.test.TestBase;
 
 /**
  * Tests the performance and memory usage claims in the documentation.
+ * 这个类可以研究下，为什么同样的操作 concurrenthashmap占用的空间比其它两个map占用的空间多？
  */
 public class TestMVStoreBenchmark extends TestBase {
 

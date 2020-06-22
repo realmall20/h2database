@@ -986,6 +986,8 @@ public abstract class Page<K,V> implements Cloneable
 
         /**
          * The position, if known, or 0.
+         * 如果不是根目录，包含 位置
+         * @see DataUtils
          */
         private long pos;
 
@@ -1115,6 +1117,7 @@ public abstract class Page<K,V> implements Cloneable
             PageReference<K,V> ref = children[index];
             Page<K,V> page = ref.getPage();
             if(page == null) {
+                //如果对象不存在，直接从磁盘上读取
                 page = map.readPage(ref.getPos());
                 assert ref.getPos() == page.getPos();
                 assert ref.count == page.getTotalCount();
