@@ -54,6 +54,10 @@ public class TestMVStoreBenchmark extends TestBase {
         testMemoryUsageComparison();
     }
 
+    /**
+     * 这个测试想要说明的是mvMap数据存放越多，相比 skipMap 和 hashMap 内存使用越少
+     * TODO 但是为什么 ？
+     */
     private void testMemoryUsageComparison() {
         long[] mem;
         long hash, tree, mv;
@@ -77,6 +81,7 @@ public class TestMVStoreBenchmark extends TestBase {
 
     }
 
+
     private long[] getMemoryUsed(int count, int size) {
         long hash, tree, mv;
         ArrayList<Map<Integer, String>> mapList;
@@ -85,6 +90,7 @@ public class TestMVStoreBenchmark extends TestBase {
         mapList = new ArrayList<>(count);
         mem = getMemory();
         for (int i = 0; i < count; i++) {
+            //arrayList存放 hashmap ，存放10000个hashmap,每一个hashmap存放30个数据
             mapList.add(new ConcurrentHashMap<Integer, String>(size));
         }
         addEntries(mapList, size);
@@ -94,6 +100,7 @@ public class TestMVStoreBenchmark extends TestBase {
         mapList.clear();
         mem = getMemory();
         for (int i = 0; i < count; i++) {
+            //arrayList存放 hashmap ，存放10000个skipListMap,每一个map存放n个数据
             mapList.add(new ConcurrentSkipListMap<Integer, String>());
         }
         addEntries(mapList, size);
@@ -104,6 +111,7 @@ public class TestMVStoreBenchmark extends TestBase {
         mem = getMemory();
         MVStore store = MVStore.open(null);
         for (int i = 0; i < count; i++) {
+            //arrayList存放 hashmap ，存放10000个MvMap,每一个map存放n个数据
             Map<Integer, String> map = store.openMap("t" + i);
             mapList.add(map);
         }
@@ -138,6 +146,9 @@ public class TestMVStoreBenchmark extends TestBase {
         return getMemoryUsedBytes();
     }
 
+    /**
+     * 测试消耗的时间
+     */
     private void testPerformanceComparison() {
         if (!config.big) {
             return;
@@ -161,8 +172,10 @@ public class TestMVStoreBenchmark extends TestBase {
             }
         }
         String msg = "mv " + mv + " tree " + tree + " hash " + hash;
+        // hash 时间 比 skip 时间小
         assertTrue(msg, hash < tree);
         // assertTrue(msg, hash < mv);
+        //hash 时间 比 mvMap 要小
         assertTrue(msg, mv < tree * 2);
     }
 
