@@ -58,6 +58,7 @@ public class TestCompatibility extends TestDb {
         conn.close();
         testIdentifiers();
         testIdentifiersCaseInResultSet();
+        testOldInformationSchema();
         deleteDb("compatibility");
 
         testUnknownURL();
@@ -691,8 +692,8 @@ public class TestCompatibility extends TestDb {
         testIdentifiers(false, true, true);
     }
 
-    private void testIdentifiers(boolean upper, boolean lower, boolean caseInsensitiveIdentifiers) throws SQLException
-    {
+    private void testIdentifiers(boolean upper, boolean lower, boolean caseInsensitiveIdentifiers) //
+            throws SQLException {
         try (Connection conn = getConnection("compatibility;DATABASE_TO_UPPER=" + upper + ";DATABASE_TO_LOWER=" + lower
                 + ";CASE_INSENSITIVE_IDENTIFIERS=" + caseInsensitiveIdentifiers)) {
             Statement stat = conn.createStatement();
@@ -742,7 +743,7 @@ public class TestCompatibility extends TestDb {
                 assertEquals(2, rs.getInt(2));
             }
         } else {
-            assertThrows(ErrorCode.TABLE_OR_VIEW_NOT_FOUND_1, stat).executeQuery(query);
+            assertThrows(ErrorCode.TABLE_OR_VIEW_NOT_FOUND_WITH_CANDIDATES_2, stat).executeQuery(query);
         }
     }
 
@@ -768,6 +769,18 @@ public class TestCompatibility extends TestDb {
             rs = stat.executeQuery("SELECT a FROM (SELECT 1) t(A)");
             md = rs.getMetaData();
             assertEquals("A", md.getColumnName(1));
+        } finally {
+            deleteDb("compatibility");
+        }
+    }
+
+    private void testOldInformationSchema() throws SQLException {
+        try (Connection conn = getConnection(
+                "compatibility;OLD_INFORMATION_SCHEMA=TRUE")) {
+            Statement stat = conn.createStatement();
+            ResultSet rs = stat.executeQuery("TABLE INFORMATION_SCHEMA.TABLE_TYPES");
+            rs.next();
+            assertEquals("TABLE", rs.getString(1));
         } finally {
             deleteDb("compatibility");
         }

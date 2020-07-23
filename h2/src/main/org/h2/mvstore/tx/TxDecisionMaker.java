@@ -5,12 +5,12 @@
  */
 package org.h2.mvstore.tx;
 
+import java.util.function.Function;
 import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVMap.Decision;
 import org.h2.mvstore.type.DataType;
 import org.h2.value.VersionedValue;
-import java.util.function.Function;
 
 /**
  * Class TxDecisionMaker is a base implementation of MVMap.DecisionMaker
@@ -45,7 +45,8 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
     private       long           undoKey;
 
     /**
-     * Id of the last operation, we decided to {@link MVMap.Decision#REPEAT}.
+     * Id of the last operation, we decided to
+     * {@link org.h2.mvstore.MVMap.Decision#REPEAT}.
      */
     private       long           lastOperationId;
 
@@ -145,12 +146,13 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
     }
 
     /**
-     * Create undo log entry and record for future references {@link MVMap.Decision#PUT} decision
-     * along with last known committed value
+     * Create undo log entry and record for future references
+     * {@link org.h2.mvstore.MVMap.Decision#PUT} decision along with last known
+     * committed value
      *
      * @param valueToLog previous value to be logged
      * @param lastValue last known committed value
-     * @return {@link MVMap.Decision#PUT}
+     * @return {@link org.h2.mvstore.MVMap.Decision#PUT}
      */
     MVMap.Decision logAndDecideToPut(VersionedValue<V> valueToLog, V lastValue) {
         undoKey = transaction.log(new Record<>(mapId, key, valueToLog));
@@ -218,7 +220,9 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
      * This is to prevent an infinite loop in case of uncommitted "leftover" entry
      * (one without a corresponding undo log entry, most likely as a result of unclean shutdown).
      *
-     * @param id for the operation we decided to {@link MVMap.Decision#REPEAT}
+     * @param id
+     *            for the operation we decided to
+     *            {@link org.h2.mvstore.MVMap.Decision#REPEAT}
      * @return true if the same as last operation id, false otherwise
      */
     final boolean isRepeatedOperation(long id) {
@@ -246,8 +250,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
 
 
 
-    public static final class PutIfAbsentDecisionMaker<K,V> extends TxDecisionMaker<K,V>
-    {
+    public static final class PutIfAbsentDecisionMaker<K,V> extends TxDecisionMaker<K,V> {
         private final Function<K, V> oldValueSupplier;
 
         PutIfAbsentDecisionMaker(int mapId, Transaction transaction, Function<K, V> oldValueSupplier) {

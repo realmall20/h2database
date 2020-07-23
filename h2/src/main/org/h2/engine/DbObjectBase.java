@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import org.h2.command.Parser;
 import org.h2.message.DbException;
 import org.h2.message.Trace;
+import org.h2.util.ParserUtil;
 
 /**
  * The base class for all database objects.
@@ -59,7 +60,7 @@ public abstract class DbObjectBase implements DbObject {
      * @param session the session
      */
     @Override
-    public abstract void removeChildrenAndResources(Session session);
+    public abstract void removeChildrenAndResources(SessionLocal session);
 
     /**
      * Tell the object that is was modified.
@@ -84,7 +85,7 @@ public abstract class DbObjectBase implements DbObject {
 
     @Override
     public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
-        return Parser.quoteIdentifier(builder, objectName, sqlFlags);
+        return ParserUtil.quoteIdentifier(builder, objectName, sqlFlags);
     }
 
     @Override
@@ -145,7 +146,7 @@ public abstract class DbObjectBase implements DbObject {
 
     @Override
     public void setComment(String comment) {
-        this.comment = comment;
+        this.comment = comment != null && !comment.isEmpty() ? comment : null;
     }
 
     @Override

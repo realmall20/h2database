@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.BitSet;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.concurrent.TimeUnit;
 import java.util.zip.CRC32;
 
 import org.h2.api.ErrorCode;
@@ -19,7 +18,7 @@ import org.h2.command.CommandInterface;
 import org.h2.command.ddl.CreateTableData;
 import org.h2.engine.Constants;
 import org.h2.engine.Database;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.engine.SysProperties;
 import org.h2.index.Cursor;
 import org.h2.index.Index;
@@ -36,6 +35,7 @@ import org.h2.pagestore.db.PageDataOverflow;
 import org.h2.pagestore.db.PageDelegateIndex;
 import org.h2.pagestore.db.PageIndex;
 import org.h2.pagestore.db.PageStoreTable;
+import org.h2.pagestore.db.SessionPageStore;
 import org.h2.result.Row;
 import org.h2.result.SortOrder;
 import org.h2.schema.Schema;
@@ -55,7 +55,7 @@ import org.h2.util.IntArray;
 import org.h2.util.IntIntHashMap;
 import org.h2.util.StringUtils;
 import org.h2.value.CompareMode;
-import org.h2.value.Value;
+import org.h2.value.TypeInfo;
 import org.h2.value.ValueInteger;
 import org.h2.value.ValueVarchar;
 
@@ -178,7 +178,7 @@ public class PageStore implements CacheWriter {
     private HashMap<Integer, Integer> reservedPages;
     private boolean isNew;
     private long maxLogSize = Constants.DEFAULT_MAX_LOG_SIZE;
-    private final Session pageStoreSession;
+    private final SessionPageStore pageStoreSession;
 
     /**
      * Each free page is marked with a set bit.
@@ -225,7 +225,7 @@ public class PageStore implements CacheWriter {
         // trace.setLevel(TraceSystem.DEBUG);
         String cacheType = database.getCacheType();
         this.cache = CacheLRU.getCache(this, cacheType, cacheSizeDefault);
-        pageStoreSession = new Session(database, null, 0);
+        pageStoreSession = new SessionPageStore(database, null, 0);
     }
 
     /**
@@ -504,7 +504,6 @@ public class PageStore implements CacheWriter {
         } finally {
             recoveryRunning = false;
         }
-        long start = System.nanoTime();
         boolean isCompactFully = compactMode ==
                 CommandInterface.SHUTDOWN_COMPACT;
         boolean isDefrag = compactMode ==
@@ -521,6 +520,7 @@ public class PageStore implements CacheWriter {
             maxCompactTime = Integer.MAX_VALUE;
             maxMove = Integer.MAX_VALUE;
         }
+        long stopAt = System.nanoTime() + maxCompactTime * 1_000_000L;
         int blockSize = isCompactFully ? COMPACT_BLOCK_SIZE : 1;
         int firstFree = MIN_PAGE_COUNT;
         for (int x = lastUsed, j = 0; x > MIN_PAGE_COUNT &&
@@ -535,8 +535,7 @@ public class PageStore implements CacheWriter {
                         }
                         if (compact(full, firstFree)) {
                             j++;
-                            long now = System.nanoTime();
-                            if (now > start + TimeUnit.MILLISECONDS.toNanos(maxCompactTime)) {
+                            if (System.nanoTime() - stopAt > 0L) {
                                 j = maxMove;
                                 break;
                             }
@@ -549,11 +548,11 @@ public class PageStore implements CacheWriter {
             log.checkpoint();
             writeBack();
             cache.clear();
-            ArrayList<Table> tables = database.getAllTablesAndViews(false);
+            ArrayList<Table> tables = database.getAllTablesAndViews();
             recordedPagesList = new ArrayList<>();
             recordedPagesIndex = new IntIntHashMap();
             recordPageReads = true;
-            Session sysSession = database.getSystemSession();
+            SessionLocal sysSession = database.getSystemSession();
             for (Table table : tables) {
                 if (!table.isTemporary() && TableType.TABLE == table.getTableType()) {
                     Index scanIndex = table.getScanIndex(sysSession);
@@ -857,11 +856,12 @@ public class PageStore implements CacheWriter {
 
     private int getFirstUncommittedSection() {
         trace.debug("getFirstUncommittedSection");
-        Session[] sessions = database.getSessions(true);
+        SessionLocal[] sessions = database.getSessions(true);
         int firstUncommittedSection = log.getLogSectionId();
-        for (Session session : sessions) {
+        for (SessionLocal s : sessions) {
+            SessionPageStore session = (SessionPageStore) s;
             int firstUncommitted = session.getFirstUncommittedLog();
-            if (firstUncommitted != Session.LOG_WRITTEN) {
+            if (firstUncommitted != SessionPageStore.LOG_WRITTEN) {
                 if (firstUncommitted < firstUncommittedSection) {
                     firstUncommittedSection = firstUncommitted;
                 }
@@ -1451,11 +1451,11 @@ public class PageStore implements CacheWriter {
      * @param row the row to add
      * @param add true if the row is added, false if it is removed
      */
-    public synchronized void logAddOrRemoveRow(Session session, int tableId,
+    public synchronized void logAddOrRemoveRow(SessionLocal session, int tableId,
             Row row, boolean add) {
         if (logMode != LOG_MODE_OFF) {
             if (!recoveryRunning) {
-                log.logAddOrRemoveRow(session, tableId, row, add);
+                log.logAddOrRemoveRow((SessionPageStore) session, tableId, row, add);
             }
         }
     }
@@ -1465,7 +1465,7 @@ public class PageStore implements CacheWriter {
      *
      * @param session the session
      */
-    public synchronized void commit(Session session) {
+    public synchronized void commit(SessionLocal session) {
         checkOpen();
         openForWriting();
         log.commit(session.getId());
@@ -1500,7 +1500,7 @@ public class PageStore implements CacheWriter {
      * @param session the session
      * @param transaction the name of the transaction
      */
-    public synchronized void prepareCommit(Session session, String transaction) {
+    public synchronized void prepareCommit(SessionLocal session, String transaction) {
         log.prepareCommit(session, transaction);
     }
 
@@ -1590,12 +1590,12 @@ public class PageStore implements CacheWriter {
     private void openMetaIndex() {
         CreateTableData data = new CreateTableData();
         ArrayList<Column> cols = data.columns;
-        cols.add(new Column("ID", Value.INTEGER));
-        cols.add(new Column("TYPE", Value.INTEGER));
-        cols.add(new Column("PARENT", Value.INTEGER));
-        cols.add(new Column("HEAD", Value.INTEGER));
-        cols.add(new Column("OPTIONS", Value.VARCHAR));
-        cols.add(new Column("COLUMNS", Value.VARCHAR));
+        cols.add(new Column("ID", TypeInfo.TYPE_INTEGER));
+        cols.add(new Column("TYPE", TypeInfo.TYPE_INTEGER));
+        cols.add(new Column("PARENT", TypeInfo.TYPE_INTEGER));
+        cols.add(new Column("HEAD", TypeInfo.TYPE_INTEGER));
+        cols.add(new Column("OPTIONS", TypeInfo.TYPE_VARCHAR));
+        cols.add(new Column("COLUMNS", TypeInfo.TYPE_VARCHAR));
         metaSchema = new Schema(database, 0, "", null, true);
         data.schema = metaSchema;
         data.tableName = "PAGE_INDEX";
@@ -1649,7 +1649,7 @@ public class PageStore implements CacheWriter {
         metaObjects.remove(id);
     }
 
-    private void addMeta(Row row, Session session, boolean redo) {
+    private void addMeta(Row row, SessionLocal session, boolean redo) {
         int id = row.getValue(0).getInt();
         int type = row.getValue(1).getInt();
         int parent = row.getValue(2).getInt();
@@ -1675,7 +1675,7 @@ public class PageStore implements CacheWriter {
                 throw DbException.throwInternalError(row.toString());
             }
             for (int i = 0, len = columns.length; i < len; i++) {
-                Column col = new Column("C" + i, Value.INTEGER);
+                Column col = new Column("C" + i, TypeInfo.TYPE_INTEGER);
                 data.columns.add(col);
             }
             data.schema = metaSchema;
@@ -1751,7 +1751,7 @@ public class PageStore implements CacheWriter {
      * @param index the index to add
      * @param session the session
      */
-    public void addMeta(PageIndex index, Session session) {
+    public void addMeta(PageIndex index, SessionLocal session) {
         Table table = index.getTable();
         if (SysProperties.CHECK) {
             if (!table.isTemporary()) {
@@ -1811,7 +1811,7 @@ public class PageStore implements CacheWriter {
      * @param index the index to remove
      * @param session the session
      */
-    public void removeMeta(Index index, Session session) {
+    public void removeMeta(Index index, SessionLocal session) {
         if (SysProperties.CHECK) {
             if (!index.getTable().isTemporary()) {
                 // to prevent ABBA locking problems, we need to always take
@@ -1831,7 +1831,7 @@ public class PageStore implements CacheWriter {
         }
     }
 
-    private void removeMetaIndex(Index index, Session session) {
+    private void removeMetaIndex(Index index, SessionLocal session) {
         int key = index.getId() + 1;
         Row row = metaIndex.getRow(session, key);
         if (row.getKey() != key) {
@@ -1927,10 +1927,10 @@ public class PageStore implements CacheWriter {
      * @param session the session
      * @param tableId the table id
      */
-    public synchronized void logTruncate(Session session, int tableId) {
+    public synchronized void logTruncate(SessionLocal session, int tableId) {
         if (!recoveryRunning) {
             openForWriting();
-            log.logTruncate(session, tableId);
+            log.logTruncate((SessionPageStore) session, tableId);
         }
     }
 
@@ -2025,7 +2025,7 @@ public class PageStore implements CacheWriter {
         return f;
     }
 
-    public Session getPageStoreSession() {
+    public SessionLocal getPageStoreSession() {
         return pageStoreSession;
     }
 

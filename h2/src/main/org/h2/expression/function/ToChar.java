@@ -16,7 +16,7 @@ import java.util.Currency;
 import java.util.Locale;
 
 import org.h2.api.ErrorCode;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.message.DbException;
 import org.h2.util.DateTimeUtils;
 import org.h2.util.StringUtils;
@@ -517,6 +517,13 @@ public class ToChar {
     }
 
     /**
+     * Used for testing.
+     */
+    public static void clearNames() {
+        NAMES = null;
+    }
+
+    /**
      * Returns time zone display name or ID for the specified date-time value.
      *
      * @param session
@@ -529,7 +536,7 @@ public class ToChar {
      *            region)
      * @return time zone display name or ID
      */
-    private static String getTimeZone(Session session, Value value, boolean tzd) {
+    private static String getTimeZone(SessionLocal session, Value value, boolean tzd) {
         if (value instanceof ValueTimestampTimeZone) {
             return DateTimeUtils.timeZoneNameFromOffsetSeconds(((ValueTimestampTimeZone) value)
                     .getTimeZoneOffsetSeconds());
@@ -685,7 +692,7 @@ public class ToChar {
      *
      * @return the formatted timestamp
      */
-    public static String toCharDateTime(Session session, Value value, String format,
+    public static String toCharDateTime(SessionLocal session, Value value, String format,
             @SuppressWarnings("unused") String nlsParam) {
         long[] a = DateTimeUtils.dateAndTimeFromValue(value, session);
         long dateValue = a[0];
@@ -828,9 +835,18 @@ public class ToChar {
             } else if (containsAt(format, i, "TZD") != null) {
                 output.append(getTimeZone(session, value, true));
                 i += 3;
+            } else if (containsAt(format, i, "TZH") != null) {
+                int hours = DateTimeFunction.extractDateTime(session, value, DateTimeFunction.TIMEZONE_HOUR);
+                output.append( hours < 0 ? '-' : '+');
+                StringUtils.appendTwoDigits(output, Math.abs(hours));
+                i += 3;
+
+            } else if (containsAt(format, i, "TZM") != null) {
+                StringUtils.appendTwoDigits(output,
+                        Math.abs(DateTimeFunction.extractDateTime(session, value, DateTimeFunction.TIMEZONE_MINUTE)));
+                i += 3;
 
                 // Week
-
             } else if (containsAt(format, i, "WW") != null) {
                 StringUtils.appendTwoDigits(output, (DateTimeUtils.getDayOfYear(dateValue) - 1) / 7 + 1);
                 i += 2;

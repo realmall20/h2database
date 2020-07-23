@@ -5,7 +5,7 @@
  */
 package org.h2.expression.aggregate;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.message.DbException;
 import org.h2.value.DataType;
 import org.h2.value.Value;
@@ -35,7 +35,7 @@ class AggregateDataDefault extends AggregateData {
     }
 
     @Override
-    void add(Session session, Value v) {
+    void add(SessionLocal session, Value v) {
         if (v == ValueNull.INSTANCE) {
             return;
         }
@@ -128,7 +128,7 @@ class AggregateDataDefault extends AggregateData {
     }
 
     @Override
-    Value getValue(Session session) {
+    Value getValue(SessionLocal session) {
         Value v = null;
         switch (aggregateType) {
         case SUM:
@@ -186,7 +186,7 @@ class AggregateDataDefault extends AggregateData {
         }
         int type = Value.getHigherOrder(a.getValueType(), Value.BIGINT);
         Value b = ValueBigint.get(by).convertTo(type);
-        a = a.convertTo(type).divide(b, ValueBigint.PRECISION);
+        a = a.convertTo(type).divide(b, ValueBigint.DECIMAL_PRECISION);
         return a;
     }
 

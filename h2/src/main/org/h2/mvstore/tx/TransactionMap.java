@@ -64,7 +64,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
     /**
      * Indicates whether underlying map was modified from within related transaction
-     * 是否从关联事务中修改了基础映射
      */
     private boolean hasChanges;
 
@@ -125,9 +124,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
      * @return the size
      */
     public long sizeAsLong() {
-        if (!transaction.isReadCommitted()) {
-            return sizeAsLongSlow();
-        }
         // getting coherent picture of the map, committing transactions, and undo logs
         // either from values stored in transaction (never loops in that case),
         // or current values from the transaction store (loops until moment of silence)
@@ -139,7 +135,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         } while (!snapshot.equals(getSnapshot()));
 
         RootReference<K,VersionedValue<V>> mapRootReference = snapshot.root;
-        BitSet committingTransactions = snapshot.committingTransactions;
         long size = mapRootReference.getTotalCount();
         long undoLogsTotalSize = undoLogRootReferences == null ? size
                 : TransactionStore.calculateUndoLogsTotalSize(undoLogRootReferences);
@@ -147,7 +142,20 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         if (undoLogsTotalSize == 0) {
             return size;
         }
+        switch (transaction.getIsolationLevel()) {
+        case READ_UNCOMMITTED:
+            return adjustSize(undoLogRootReferences, mapRootReference, null, size, undoLogsTotalSize);
+        case READ_COMMITTED:
+            return adjustSize(undoLogRootReferences, mapRootReference, snapshot.committingTransactions, size,
+                    undoLogsTotalSize);
+        default:
+            return sizeAsLongSlow();
+        }
+    }
 
+    private long adjustSize(RootReference<Long, Record<?, ?>>[] undoLogRootReferences,
+            RootReference<K, VersionedValue<V>> mapRootReference, BitSet committingTransactions, long size,
+            long undoLogsTotalSize) {
         // Entries describing removals from the map by this transaction and all transactions,
         // which are committed but not closed yet,
         // and entries about additions to the map by other uncommitted transactions were counted,
@@ -155,7 +163,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         if (2 * undoLogsTotalSize > size) {
             // the undo log is larger than half of the map - scan the entries of the map directly
             Cursor<K, VersionedValue<V>> cursor = map.cursor(mapRootReference, null, null, false);
-            while(cursor.hasNext()) {
+            while (cursor.hasNext()) {
                 cursor.next();
                 VersionedValue<?> currentValue = cursor.getValue();
                 assert currentValue != null;
@@ -203,6 +211,18 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         return size;
     }
 
+    private boolean isIrrelevant(long operationId, VersionedValue<?> currentValue, BitSet committingTransactions) {
+        Object v;
+        if (committingTransactions == null) {
+            v = currentValue.getCurrentValue();
+        } else {
+            int txId = TransactionStore.getTransactionId(operationId);
+            v = txId == transaction.transactionId || committingTransactions.get(txId)
+                    ? currentValue.getCurrentValue() : currentValue.getCommittedValue();
+        }
+        return v == null;
+    }
+
     private long sizeAsLongSlow() {
         long count = 0L;
         Iterator<K> iterator = keyIterator(null, null);
@@ -212,14 +232,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         }
         return count;
     }
-
-    private boolean isIrrelevant(long operationId, VersionedValue<?> currentValue, BitSet committingTransactions) {
-        int txId = TransactionStore.getTransactionId(operationId);
-        boolean isVisible = txId == transaction.transactionId || committingTransactions.get(txId);
-        Object v = isVisible ? currentValue.getCurrentValue() : currentValue.getCommittedValue();
-        return v == null;
-    }
-
 
     /**
      * Remove an entry.
@@ -318,7 +330,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
     }
 
     private V set(K key, V value) {
-        //删除的时候其实不是删除，而是添加一个操作记录
         txDecisionMaker.initialize(key, value);
         return set(key, txDecisionMaker);
     }
@@ -510,7 +521,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
 
     /**
      * Create a new snapshot for this map.
-     * 创建镜像数据
+     *
      * @return the snapshot
      */
     Snapshot<K,VersionedValue<V>> createSnapshot() {
@@ -532,13 +543,9 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         AtomicReference<BitSet> holder = transaction.store.committingTransactions;
         BitSet committingTransactions = holder.get();
         while (true) {
-            //上次提交的版本信息
             BitSet prevCommittingTransactions = committingTransactions;
-            //TODO 这个读是读取镜像吗？
             RootReference<K,VersionedValue<V>> root = map.getRoot();
-            //这次的版本信息
             committingTransactions = holder.get();
-            //
             if (committingTransactions == prevCommittingTransactions) {
                 return snapshotConsumer.apply(root, committingTransactions);
             }
@@ -753,15 +760,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         return chooseIterator(from, to, false, true);
     }
 
-    /**
-     * query的时候根据不同的隔离级别，返回不同的数据
-     * @param from
-     * @param to
-     * @param reverse
-     * @param forEntries
-     * @param <X>
-     * @return
-     */
     private <X> Iterator<X> chooseIterator(K from, K to, boolean reverse, boolean forEntries) {
         switch (transaction.isolationLevel) {
             case READ_UNCOMMITTED:
@@ -769,7 +767,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
             case REPEATABLE_READ:
             case SNAPSHOT:
             case SERIALIZABLE:
-                //有数据变，返回数据和read_committed 迭代器是不一样的
                 if (hasChanges) {
                     return new RepeatableIterator<>(this, from, to, reverse, forEntries);
                 }
@@ -797,8 +794,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
      * @param <X>
      *            the type of elements
      */
-    private static class UncommittedIterator<K,V,X> extends TMIterator<K,V,X>
-    {
+    private static class UncommittedIterator<K,V,X> extends TMIterator<K,V,X> {
         UncommittedIterator(TransactionMap<K, V> transactionMap, K from, K to, boolean reverse, boolean forEntries) {
             super(transactionMap, from, to, transactionMap.createSnapshot(), reverse, forEntries);
             fetchNext();
@@ -831,8 +827,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         }
     }
 
-    private static final class ValidationIterator<K,V,X> extends UncommittedIterator<K,V,X>
-    {
+    private static final class ValidationIterator<K,V,X> extends UncommittedIterator<K,V,X> {
         ValidationIterator(TransactionMap<K,V> transactionMap, K from, K to) {
             super(transactionMap, from, to, transactionMap.createSnapshot(), false, false);
         }
@@ -850,7 +845,6 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
     }
 
     /**
-     *
      * The iterator for read committed isolation level. Can also be used on
      * higher levels when the transaction doesn't have own changes.
      *
@@ -859,8 +853,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
      * @param <X>
      *            the type of elements
      */
-    private static final class CommittedIterator<K,V,X> extends TMIterator<K,V,X>
-    {
+    private static final class CommittedIterator<K,V,X> extends TMIterator<K,V,X> {
         CommittedIterator(TransactionMap<K, V> transactionMap, K from, K to, boolean reverse, boolean forEntries) {
             super(transactionMap, from, to, transactionMap.getSnapshot(), reverse, forEntries);
             fetchNext();
@@ -907,8 +900,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
      * @param <X>
      *            the type of elements
      */
-    private static final class RepeatableIterator<K,V,X> extends TMIterator<K,V,X>
-    {
+    private static final class RepeatableIterator<K,V,X> extends TMIterator<K,V,X> {
         private final DataType<K> keyType;
 
         private K snapshotKey;
@@ -1003,19 +995,11 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         }
     }
 
-    private abstract static class TMIterator<K,V,X> implements Iterator<X>
-    {
-        /**
-         * 事务ID
-         */
+    private abstract static class TMIterator<K,V,X> implements Iterator<X> {
         final int transactionId;
-        /**
-         * 正在提交中的事务
-          */
+
         final BitSet committingTransactions;
-        /**
-         * 游标，还是可以理解成链表数据。
-         */
+
         protected final Cursor<K, VersionedValue<V>> cursor;
 
         private final boolean forEntries;

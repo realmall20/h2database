@@ -33,8 +33,8 @@ import org.h2.util.Utils;
  * leaf: values (one for each key)
  * node: children (1 more than keys)
  */
-public abstract class Page<K,V> implements Cloneable
-{
+public abstract class Page<K,V> implements Cloneable {
+
     /**
      * Map this page belongs to
      */
@@ -92,7 +92,7 @@ public abstract class Page<K,V> implements Cloneable
      */
     @SuppressWarnings("rawtypes")
     private static final AtomicLongFieldUpdater<Page> posUpdater =
-            AtomicLongFieldUpdater.newUpdater(Page.class, "pos");
+                                                AtomicLongFieldUpdater.newUpdater(Page.class, "pos");
     /**
      * The estimated number of bytes used per child entry.
      */
@@ -103,25 +103,25 @@ public abstract class Page<K,V> implements Cloneable
      */
     private static final int PAGE_MEMORY =
             MEMORY_OBJECT +           // this
-                    2 * MEMORY_POINTER +      // map, keys
-                    MEMORY_ARRAY +            // Object[] keys
-                    17;                       // pos, cachedCompare, memory, removedInMemory
+            2 * MEMORY_POINTER +      // map, keys
+            MEMORY_ARRAY +            // Object[] keys
+            17;                       // pos, cachedCompare, memory, removedInMemory
     /**
      * The estimated number of bytes used per empty internal page object.
      */
     static final int PAGE_NODE_MEMORY =
             PAGE_MEMORY +             // super
-                    MEMORY_POINTER +          // children
-                    MEMORY_ARRAY +            // Object[] children
-                    8;                        // totalCount
+            MEMORY_POINTER +          // children
+            MEMORY_ARRAY +            // Object[] children
+            8;                        // totalCount
 
     /**
      * The estimated number of bytes used per empty leaf page.
      */
     static final int PAGE_LEAF_MEMORY =
             PAGE_MEMORY +             // super
-                    MEMORY_POINTER +          // values
-                    MEMORY_ARRAY;             // Object[] values
+            MEMORY_POINTER +          // values
+            MEMORY_ARRAY;             // Object[] values
 
     /**
      * Marker value for memory field, meaning that memory accounting is replaced by key count.
@@ -489,7 +489,7 @@ public abstract class Page<K,V> implements Cloneable
      * Replace the key at an index in this page.
      *
      * @param index the index
-     * @param key   the new key
+     * @param key the new key
      */
     public final void setKey(int index, K key) {
         keys = keys.clone();
@@ -802,7 +802,7 @@ public abstract class Page<K,V> implements Cloneable
      * update the position and the children.
      * @param chunk the chunk
      * @param buff the target buffer
-     * @param toc
+     * @param toc prospective table of content
      */
     abstract void writeUnsavedRecursive(Chunk chunk, WriteBuffer buff, List<Long> toc);
 
@@ -904,12 +904,12 @@ public abstract class Page<K,V> implements Cloneable
      *
      * @param version at which page was removed
      * @return amount (negative), by which "unsaved memory" should be adjusted,
-     * if page is unsaved one, and 0 for page that was already saved, or
-     * in case of non-persistent map
+     *         if page is unsaved one, and 0 for page that was already saved, or
+     *         in case of non-persistent map
      * 删除页数据
      */
     public final int removePage(long version) {
-        if (isPersistent() && getTotalCount() > 0) {
+        if(isPersistent() && getTotalCount() > 0) {
             MVStore store = map.store;
             if (!markAsRemoved()) { // only if it has been saved already
                 long pagePos = pos;
@@ -927,7 +927,7 @@ public abstract class Page<K,V> implements Cloneable
      * @param cursorPos presumably pointing to this Page (null if real root), to build upon
      * @return new head of the CursorPos chain
      */
-    public abstract CursorPos<K, V> getPrependCursorPos(CursorPos<K, V> cursorPos);
+    public abstract CursorPos<K,V> getPrependCursorPos(CursorPos<K,V> cursorPos);
 
     /**
      * Extend path from a given CursorPos chain to "append point" in a B-tree, rooted at this Page.
@@ -935,12 +935,11 @@ public abstract class Page<K,V> implements Cloneable
      * @param cursorPos presumably pointing to this Page (null if real root), to build upon
      * @return new head of the CursorPos chain
      */
-    public abstract CursorPos<K, V> getAppendCursorPos(CursorPos<K, V> cursorPos);
+    public abstract CursorPos<K,V> getAppendCursorPos(CursorPos<K,V> cursorPos);
 
     /**
      * 递归删除所有该版本的重复数据
      * Remove all page data recursively.
-     *
      * @param version at which page got removed
      * @return adjustment for "unsaved memory" amount
      */
@@ -962,11 +961,16 @@ public abstract class Page<K,V> implements Cloneable
      * @param size number of entries
      * @return values array
      */
-    final V[] createValueStorage(int size)
-    {
+    final V[] createValueStorage(int size) {
         return map.getValueType().createStorage(size);
     }
 
+    /**
+     * Create an array of page references.
+     *
+     * @param size the number of entries
+     * @return the array
+     */
     @SuppressWarnings("unchecked")
     public static <K,V> PageReference<K,V>[] createRefStorage(int size) {
         return new PageReference[size];
@@ -1002,6 +1006,11 @@ public abstract class Page<K,V> implements Cloneable
          */
         final long count;
 
+        /**
+         * Get an empty page reference.
+         *
+         * @return the page reference
+         */
         @SuppressWarnings("unchecked")
         public static <X,Y> PageReference<X,Y> empty() {
             return EMPTY;
@@ -1202,7 +1211,7 @@ public abstract class Page<K,V> implements Cloneable
         @Override
         public void setChild(int index, Page<K, V> c) {
             assert c != null;
-            PageReference<K, V> child = children[index];
+            PageReference<K,V> child = children[index];
             if (c != child.getPage() || c.getPos() != child.getPos()) {
                 totalCount += c.getTotalCount() - child.count;
                 children = children.clone();
@@ -1221,11 +1230,11 @@ public abstract class Page<K,V> implements Cloneable
         }
 
         @Override
-        public void insertNode(int index, K key, Page<K, V> childPage) {
+        public void insertNode(int index, K key, Page<K,V> childPage) {
             int childCount = getRawChildPageCount();
             insertKey(index, key);
 
-            PageReference<K, V>[] newChildren = createRefStorage(childCount + 1);
+            PageReference<K,V>[] newChildren = createRefStorage(childCount + 1);
             DataUtils.copyWithGap(children, newChildren, childCount, index);
             children = newChildren;
             children[index] = new PageReference<>(childPage);
@@ -1240,7 +1249,7 @@ public abstract class Page<K,V> implements Cloneable
         public void remove(int index) {
             int childCount = getRawChildPageCount();
             super.remove(index);
-            if (isPersistent()) {
+            if(isPersistent()) {
                 addMemory(-MEMORY_POINTER - PAGE_MEMORY_CHILD);
             }
             totalCount -= children[index].count;
@@ -1368,7 +1377,7 @@ public abstract class Page<K,V> implements Cloneable
         @Override
         protected int calculateMemory() {
             return super.calculateMemory() + PAGE_NODE_MEMORY +
-                    getRawChildPageCount() * (MEMORY_POINTER + PAGE_MEMORY_CHILD);
+                        getRawChildPageCount() * (MEMORY_POINTER + PAGE_MEMORY_CHILD);
         }
 
         @Override
@@ -1380,7 +1389,7 @@ public abstract class Page<K,V> implements Cloneable
                     buff.append(" ");
                 }
                 buff.append("[").append(Long.toHexString(children[i].getPos())).append("]");
-                if (i < keyCount) {
+                if(i < keyCount) {
                     buff.append(" ").append(getKey(i));
                 }
             }
@@ -1388,17 +1397,17 @@ public abstract class Page<K,V> implements Cloneable
     }
 
 
-    private static class IncompleteNonLeaf<K, V> extends NonLeaf<K, V> {
+    private static class IncompleteNonLeaf<K,V> extends NonLeaf<K,V> {
 
         private boolean complete;
 
-        IncompleteNonLeaf(MVMap<K, V> map, NonLeaf<K, V> source) {
+        IncompleteNonLeaf(MVMap<K,V> map, NonLeaf<K,V> source) {
             super(map, source, constructEmptyPageRefs(source.getRawChildPageCount()), source.getTotalCount());
         }
 
-        private static <K, V> PageReference<K, V>[] constructEmptyPageRefs(int size) {
+        private static <K,V> PageReference<K,V>[] constructEmptyPageRefs(int size) {
             // replace child pages with empty pages
-            PageReference<K, V>[] children = createRefStorage(size);
+            PageReference<K,V>[] children = createRefStorage(size);
             Arrays.fill(children, PageReference.empty());
             return children;
         }
@@ -1438,7 +1447,7 @@ public abstract class Page<K,V> implements Cloneable
      * @param <K>
      * @param <V>
      */
-    private static class Leaf<K, V> extends Page<K, V> {
+    private static class Leaf<K,V> extends Page<K,V> {
         /**
          * The storage for values.
          */

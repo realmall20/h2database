@@ -5,7 +5,7 @@
  */
 package org.h2.expression;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.condition.Comparison;
 import org.h2.index.IndexCondition;
 import org.h2.message.DbException;
@@ -13,9 +13,9 @@ import org.h2.table.TableFilter;
 import org.h2.value.TypeInfo;
 import org.h2.value.Value;
 import org.h2.value.ValueBoolean;
-import org.h2.value.ValueCollectionBase;
 import org.h2.value.ValueNull;
 import org.h2.value.ValueResultSet;
+import org.h2.value.ValueRow;
 
 /**
  * An expression representing a constant value.
@@ -93,7 +93,7 @@ public class ValueExpression extends Operation0 {
     }
 
     @Override
-    public Value getValue(Session session) {
+    public Value getValue(SessionLocal session) {
         return value;
     }
 
@@ -103,15 +103,15 @@ public class ValueExpression extends Operation0 {
     }
 
     @Override
-    public void createIndexConditions(Session session, TableFilter filter) {
+    public void createIndexConditions(SessionLocal session, TableFilter filter) {
         if (value.getValueType() == Value.BOOLEAN && !value.getBoolean()) {
             filter.addIndexCondition(IndexCondition.get(Comparison.FALSE, null, this));
         }
     }
 
     @Override
-    public Expression getNotIfPossible(Session session) {
-        return new Comparison(Comparison.EQUAL, this, ValueExpression.FALSE);
+    public Expression getNotIfPossible(SessionLocal session) {
+        return new Comparison(Comparison.EQUAL, this, ValueExpression.FALSE, false);
     }
 
     @Override
@@ -130,7 +130,7 @@ public class ValueExpression extends Operation0 {
     }
 
     @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
         if (this == DEFAULT) {
             builder.append("DEFAULT");
         } else {
@@ -165,12 +165,11 @@ public class ValueExpression extends Operation0 {
     }
 
     @Override
-    public Expression[] getExpressionColumns(Session session) {
+    public Expression[] getExpressionColumns(SessionLocal session) {
         int valueType = getType().getValueType();
         switch (valueType) {
-        case Value.ARRAY:
         case Value.ROW:
-            return getExpressionColumns(session, (ValueCollectionBase) getValue(session));
+            return getExpressionColumns(session, (ValueRow) getValue(session));
         case Value.RESULT_SET:
             return getExpressionColumns(session, ((ValueResultSet) getValue(session)).getResult());
         }

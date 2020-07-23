@@ -37,6 +37,7 @@ import org.h2.engine.DbObject;
 import org.h2.engine.MetaRecord;
 import org.h2.jdbc.JdbcConnection;
 import org.h2.message.DbException;
+import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.MVMap;
 import org.h2.mvstore.MVStore;
 import org.h2.mvstore.MVStoreTool;
@@ -930,7 +931,7 @@ public class Recover extends Tool implements DataHandler {
                     try {
                         compress.expand(compressBuffer, 0, size, data, 0, pageSize);
                     } catch (ArrayIndexOutOfBoundsException e) {
-                        throw DbException.convertToIOException(e);
+                        throw DataUtils.convertToIOException(e);
                     }
                 }
                 String typeName = "";
@@ -1049,8 +1050,6 @@ public class Recover extends Tool implements DataHandler {
                 int sessionId = in.readVarInt();
                 String transaction = in.readString();
                 writer.println("-- prepare commit " + sessionId + " " + transaction);
-            } else if (x == PageLog.NOOP) {
-                // nothing to do
             } else if (x == PageLog.CHECKPOINT) {
                 writer.println("-- checkpoint");
             } else if (x == PageLog.FREE_LOG) {

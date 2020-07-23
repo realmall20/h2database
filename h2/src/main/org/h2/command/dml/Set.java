@@ -15,13 +15,14 @@ import org.h2.compress.Compressor;
 import org.h2.engine.Constants;
 import org.h2.engine.Database;
 import org.h2.engine.Mode;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.engine.Setting;
 import org.h2.expression.Expression;
 import org.h2.expression.TimeZoneOperation;
 import org.h2.expression.ValueExpression;
 import org.h2.message.DbException;
 import org.h2.message.Trace;
+import org.h2.mode.DefaultNullOrdering;
 import org.h2.result.ResultInterface;
 import org.h2.schema.Schema;
 import org.h2.security.auth.AuthenticatorFactory;
@@ -47,7 +48,7 @@ public class Set extends Prepared {
     private String stringValue;
     private String[] stringValueList;
 
-    public Set(Session session, int type) {
+    public Set(SessionLocal session, int type) {
         super(session);
         this.type = type;
     }
@@ -125,7 +126,7 @@ public class Set extends Prepared {
                 database.setCluster(value);
                 // use the system session so that the current transaction
                 // (if any) is not committed
-                Session sysSession = database.getSystemSession();
+                SessionLocal sysSession = database.getSystemSession();
                 synchronized (sysSession) {
                     synchronized (database) {
                         addOrUpdateSetting(sysSession, name, value, 0);
@@ -174,14 +175,8 @@ public class Set extends Prepared {
         }
         case SetTypes.BINARY_COLLATION: {
             session.getUser().checkAdmin();
-            boolean unsigned;
-            if (stringValue.equals(CompareMode.SIGNED)) {
-                unsigned = false;
-            } else if (stringValue.equals(CompareMode.UNSIGNED)) {
-                unsigned = true;
-            } else {
-                throw DbException.getInvalidValueException("BINARY_COLLATION", stringValue);
-            }
+            stringValue = StringUtils.toUpperEnglish(stringValue);
+            boolean unsigned = isUnsignedCollation("BINARY_COLLATION");
             synchronized (database) {
                 CompareMode currentMode = database.getCompareMode();
                 if (currentMode.isBinaryUnsigned() != unsigned) {
@@ -199,14 +194,8 @@ public class Set extends Prepared {
         }
         case SetTypes.UUID_COLLATION: {
             session.getUser().checkAdmin();
-            boolean unsigned;
-            if (stringValue.equals(CompareMode.SIGNED)) {
-                unsigned = false;
-            } else if (stringValue.equals(CompareMode.UNSIGNED)) {
-                unsigned = true;
-            } else {
-                throw DbException.getInvalidValueException("UUID_COLLATION", stringValue);
-            }
+            stringValue = StringUtils.toUpperEnglish(stringValue);
+            boolean unsigned = isUnsignedCollation("UUID_COLLATION");
             synchronized (database) {
                 CompareMode currentMode = database.getCompareMode();
                 if (currentMode.isUuidUnsigned() != unsigned) {
@@ -633,6 +622,19 @@ public class Set extends Prepared {
         case SetTypes.VARIABLE_BINARY:
             session.setVariableBinary(expression.getBooleanValue(session));
             break;
+        case SetTypes.DEFAULT_NULL_ORDERING: {
+            DefaultNullOrdering defaultNullOrdering;
+            try {
+                defaultNullOrdering = DefaultNullOrdering.valueOf(StringUtils.toUpperEnglish(stringValue));
+            } catch (RuntimeException e) {
+                throw DbException.getInvalidValueException("DEFAULT_NULL_ORDERING", stringValue);
+            }
+            if (database.getDefaultNullOrdering() != defaultNullOrdering) {
+                session.getUser().checkAdmin();
+                database.setDefaultNullOrdering(defaultNullOrdering);
+            }
+            break;
+        }
         default:
             DbException.throwInternalError("type="+type);
         }
@@ -642,6 +644,15 @@ public class Set extends Prepared {
         // when changing the compatibility mode
         database.getNextModificationMetaId();
         return 0;
+    }
+
+    private boolean isUnsignedCollation(String param) {
+        if (stringValue.equals(CompareMode.UNSIGNED)) {
+            return true;
+        } else if (stringValue.equals(CompareMode.SIGNED)) {
+            return false;
+        }
+        throw DbException.getInvalidValueException(param, stringValue);
     }
 
     private static TimeZoneProvider parseTimeZone(Value v) {
@@ -676,7 +687,7 @@ public class Set extends Prepared {
         addOrUpdateSetting(session, name, s, v);
     }
 
-    private void addOrUpdateSetting(Session session, String name, String s, int v) {
+    private void addOrUpdateSetting(SessionLocal session, String name, String s, int v) {
         Database database = session.getDatabase();
         assert Thread.holdsLock(database);
         if (database.isReadOnly()) {

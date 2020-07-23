@@ -6,7 +6,7 @@
 package org.h2.expression;
 
 import org.h2.command.Prepared;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.message.DbException;
 import org.h2.value.TypeInfo;
 import org.h2.value.Value;
@@ -27,7 +27,7 @@ public class Rownum extends Operation0 {
     }
 
     @Override
-    public Value getValue(Session session) {
+    public Value getValue(SessionLocal session) {
         return ValueBigint.get(prepared.getCurrentRowNumber());
     }
 
@@ -37,12 +37,7 @@ public class Rownum extends Operation0 {
     }
 
     @Override
-    public String getSQL(int sqlFlags) {
-        return "ROWNUM()";
-    }
-
-    @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
         return builder.append("ROWNUM()");
     }
 

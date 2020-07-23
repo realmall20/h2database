@@ -14,11 +14,18 @@ import org.h2.value.ValueBigint;
  * 表 行数据存贮的基本单位，存在 里面？
  */
 public class DefaultRow extends Row {
-    protected final Value[] data;
-    private         int     memory;
 
+    /**
+     * The constant that means "memory usage is unknown and needs to be calculated first".
+     */
     public static final int MEMORY_CALCULATE = -1;
 
+    /**
+     * The values of the row (one entry per column).
+     */
+    protected final Value[] data;
+
+    private int memory;
 
     DefaultRow(int columnCount) {
         this.data = new Value[columnCount];

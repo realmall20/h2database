@@ -19,10 +19,11 @@ import org.h2.engine.CastDataProvider;
 import org.h2.engine.Database;
 import org.h2.engine.Mode;
 import org.h2.message.DbException;
+import org.h2.mode.DefaultNullOrdering;
 import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.WriteBuffer;
+import org.h2.mvstore.rtree.Spatial;
 import org.h2.mvstore.rtree.SpatialDataType;
-import org.h2.mvstore.rtree.SpatialKey;
 import org.h2.mvstore.type.BasicDataType;
 import org.h2.mvstore.type.DataType;
 import org.h2.mvstore.type.MetaType;
@@ -45,6 +46,7 @@ import org.h2.value.ValueBoolean;
 import org.h2.value.ValueChar;
 import org.h2.value.ValueCollectionBase;
 import org.h2.value.ValueDate;
+import org.h2.value.ValueDecfloat;
 import org.h2.value.ValueDouble;
 import org.h2.value.ValueGeometry;
 import org.h2.value.ValueInteger;
@@ -120,6 +122,7 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
     private static final int TIMESTAMP_TZ_2 = 135;
     private static final int TIME_TZ = 136;
     private static final int BINARY = 137;
+    private static final int DECFLOAT = 138;
 
     final DataHandler handler;
     final CastDataProvider provider;
@@ -156,7 +159,12 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
 
     private SpatialDataType getSpatialDataType() {
         if (spatialType == null) {
-            spatialType = new SpatialDataType(2);
+            spatialType = new SpatialDataType(2) {
+                @Override
+                protected Spatial create(long id, float... minMax) {
+                    return new SpatialKey(id, minMax);
+                }
+            };
         }
         return spatialType;
     }
@@ -245,7 +253,11 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
         }
         boolean aNull = a == ValueNull.INSTANCE;
         if (aNull || b == ValueNull.INSTANCE) {
-            return SortOrder.compareNull(aNull, sortType);
+            /*
+             * Indexes with nullable values should have explicit null ordering,
+             * so default should not matter.
+             */
+            return DefaultNullOrdering.LOW.compareNull(aNull, sortType);
         }
 
         int comp = a.compareTo(b, provider, compareMode);
@@ -339,6 +351,15 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
                         put(bytes);
                 }
             }
+            break;
+        }
+        case Value.DECFLOAT: {
+            BigDecimal x = v.getBigDecimal();
+            byte[] bytes = x.unscaledValue().toByteArray();
+            buff.put((byte) DECFLOAT).
+                putVarInt(x.scale()).
+                putVarInt(bytes.length).
+                put(bytes);
             break;
         }
         case Value.TIME: {
@@ -508,8 +529,7 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
                 break;
             }
             //$FALL-THROUGH$
-        case Value.ROW:
-        {
+        case Value.ROW: {
             Value[] list = ((ValueCollectionBase) v).getList();
             buff.put(type == Value.ARRAY ? ARRAY : ROW)
                     .putVarInt(list.length);
@@ -682,8 +702,14 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
             int len = readVarInt(buff);
             byte[] buff2 = Utils.newBytes(len);
             buff.get(buff2, 0, len);
-            BigInteger b = new BigInteger(buff2);
-            return ValueNumeric.get(new BigDecimal(b, scale));
+            return ValueNumeric.get(new BigDecimal(new BigInteger(buff2), scale));
+        }
+        case DECFLOAT: {
+            int scale = readVarInt(buff);
+            int len = readVarInt(buff);
+            byte[] buff2 = Utils.newBytes(len);
+            buff.get(buff2, 0, len);
+            return ValueDecfloat.get(new BigDecimal(new BigInteger(buff2), scale));
         }
         case DATE: {
             return ValueDate.fromDateValue(readVarLong(buff));
@@ -801,8 +827,7 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
                 return row;
             }
             //$FALL-THROUGH$
-        case ROW:
-        {
+        case ROW: {
             int len = readVarInt(buff);
             Value[] list = new Value[len];
             for (int i = 0; i < len; i++) {
@@ -833,7 +858,7 @@ public final class ValueDataType extends BasicDataType<Value> implements Statefu
             return ValueGeometry.get(b);
         }
         case SPATIAL_KEY_2D:
-            return getSpatialDataType().read(buff);
+            return (SpatialKey)getSpatialDataType().read(buff);
         case JSON: {
             int len = readVarInt(buff);
             byte[] b = Utils.newBytes(len);

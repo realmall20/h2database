@@ -18,7 +18,7 @@ import org.h2.command.query.AllColumnsForPlan;
 import org.h2.command.query.Query;
 import org.h2.engine.Database;
 import org.h2.engine.DbObject;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.engine.User;
 import org.h2.expression.Expression;
 import org.h2.expression.ExpressionVisitor;
@@ -61,7 +61,7 @@ public class TableView extends Table {
     private boolean isTableExpression;
 
     public TableView(Schema schema, int id, String name, String querySQL,
-            ArrayList<Parameter> params, Column[] columnTemplates, Session session,
+            ArrayList<Parameter> params, Column[] columnTemplates, SessionLocal session,
             boolean allowRecursive, boolean literalsChecked, boolean isTableExpression, boolean isTemporary) {
         super(schema, id, name, false, true);
         setTemporary(isTemporary);
@@ -79,7 +79,7 @@ public class TableView extends Table {
      * @param force if errors should be ignored
      * @param literalsChecked if literals have been checked
      */
-    public void replace(String querySQL,  Column[] newColumnTemplates, Session session,
+    public void replace(String querySQL,  Column[] newColumnTemplates, SessionLocal session,
             boolean recursive, boolean force, boolean literalsChecked) {
         String oldQuerySQL = this.querySQL;
         Column[] oldColumnTemplates = this.columnTemplates;
@@ -95,7 +95,7 @@ public class TableView extends Table {
     }
 
     private synchronized void init(String querySQL, ArrayList<Parameter> params,
-            Column[] columnTemplates, Session session, boolean allowRecursive, boolean literalsChecked,
+            Column[] columnTemplates, SessionLocal session, boolean allowRecursive, boolean literalsChecked,
             boolean isTableExpression) {
         this.querySQL = querySQL;
         this.columnTemplates = columnTemplates;
@@ -106,7 +106,7 @@ public class TableView extends Table {
         initColumnsAndTables(session, literalsChecked);
     }
 
-    private Query compileViewQuery(Session session, String sql, boolean literalsChecked, String viewName) {
+    private Query compileViewQuery(SessionLocal session, String sql, boolean literalsChecked, String viewName) {
         Prepared p;
         session.setParsingCreateView(true, viewName);
         try {
@@ -134,7 +134,7 @@ public class TableView extends Table {
      * @return the exception if re-compiling this or any dependent view failed
      *         (only when force is disabled)
      */
-    public synchronized DbException recompile(Session session, boolean force,
+    public synchronized DbException recompile(SessionLocal session, boolean force,
             boolean clearIndexCache) {
         try {
             compileViewQuery(session, querySQL, false, getName());
@@ -157,7 +157,7 @@ public class TableView extends Table {
         return force ? null : createException;
     }
 
-    private void initColumnsAndTables(Session session, boolean literalsChecked) {
+    private void initColumnsAndTables(SessionLocal session, boolean literalsChecked) {
         Column[] cols;
         removeCurrentViewFromOtherTables();
         setTableExpression(isTableExpression);
@@ -182,9 +182,7 @@ public class TableView extends Table {
                 if (type.getValueType() == Value.UNKNOWN) {
                     type = expr.getType();
                 }
-                Column col = new Column(name, type);
-                col.setTable(this, i);
-                list.add(col);
+                list.add(new Column(name, type, this, i));
             }
             cols = list.toArray(new Column[0]);
             createException = null;
@@ -235,7 +233,7 @@ public class TableView extends Table {
     }
 
     @Override
-    public PlanItem getBestPlanItem(Session session, int[] masks,
+    public PlanItem getBestPlanItem(SessionLocal session, int[] masks,
             TableFilter[] filters, int filter, SortOrder sortOrder,
             AllColumnsForPlan allColumnsSet) {
         final CacheKey cacheKey = new CacheKey(masks, this);
@@ -329,18 +327,18 @@ public class TableView extends Table {
     }
 
     @Override
-    public boolean lock(Session session, boolean exclusive, boolean forceLockEvenInMvcc) {
+    public boolean lock(SessionLocal session, boolean exclusive, boolean forceLockEvenInMvcc) {
         // exclusive lock means: the view will be dropped
         return false;
     }
 
     @Override
-    public void close(Session session) {
+    public void close(SessionLocal session) {
         // nothing to do
     }
 
     @Override
-    public void unlock(Session s) {
+    public void unlock(SessionLocal s) {
         // nothing to do
     }
 
@@ -350,19 +348,24 @@ public class TableView extends Table {
     }
 
     @Override
-    public Index addIndex(Session session, String indexName, int indexId,
+    public Index addIndex(SessionLocal session, String indexName, int indexId,
             IndexColumn[] cols, IndexType indexType, boolean create,
             String indexComment) {
         throw DbException.getUnsupportedException("VIEW");
     }
 
     @Override
-    public void removeRow(Session session, Row row) {
+    public boolean isInsertable() {
+        return false;
+    }
+
+    @Override
+    public void removeRow(SessionLocal session, Row row) {
         throw DbException.getUnsupportedException("VIEW");
     }
 
     @Override
-    public void addRow(Session session, Row row) {
+    public void addRow(SessionLocal session, Row row) {
         throw DbException.getUnsupportedException("VIEW");
     }
 
@@ -372,17 +375,17 @@ public class TableView extends Table {
     }
 
     @Override
-    public void truncate(Session session) {
+    public void truncate(SessionLocal session) {
         throw DbException.getUnsupportedException("VIEW");
     }
 
     @Override
-    public long getRowCount(Session session) {
+    public long getRowCount(SessionLocal session) {
         throw DbException.throwInternalError(toString());
     }
 
     @Override
-    public boolean canGetRowCount() {
+    public boolean canGetRowCount(SessionLocal session) {
         // TODO view: could get the row count, but not that easy
         return false;
     }
@@ -398,7 +401,7 @@ public class TableView extends Table {
     }
 
     @Override
-    public void removeChildrenAndResources(Session session) {
+    public void removeChildrenAndResources(SessionLocal session) {
         removeCurrentViewFromOtherTables();
         super.removeChildrenAndResources(session);
         database.removeMeta(session, getId());
@@ -414,7 +417,7 @@ public class TableView extends Table {
      * @param database the database
      */
     public static void clearIndexCaches(Database database) {
-        for (Session s : database.getSessions(true)) {
+        for (SessionLocal s : database.getSessions(true)) {
             s.clearViewIndexCache();
         }
     }
@@ -433,12 +436,12 @@ public class TableView extends Table {
     }
 
     @Override
-    public Index getScanIndex(Session session) {
+    public Index getScanIndex(SessionLocal session) {
         return getBestPlanItem(session, null, null, -1, null, null).getIndex();
     }
 
     @Override
-    public Index getScanIndex(Session session, int[] masks,
+    public Index getScanIndex(SessionLocal session, int[] masks,
             TableFilter[] filters, int filter, SortOrder sortOrder,
             AllColumnsForPlan allColumnsSet) {
         if (createException != null) {
@@ -517,7 +520,7 @@ public class TableView extends Table {
      * @param topQuery the top level query
      * @return the view table
      */
-    public static TableView createTempView(Session session, User owner,
+    public static TableView createTempView(SessionLocal session, User owner,
             String name, Column[] columnTemplates, Query query, Query topQuery) {
         Schema mainSchema = session.getDatabase().getMainSchema();
         String querySQL = query.getPlanSQL(DEFAULT_SQL_FLAGS);
@@ -539,7 +542,7 @@ public class TableView extends Table {
     }
 
     @Override
-    public long getRowCountApproximation() {
+    public long getRowCountApproximation(SessionLocal session) {
         return ROW_COUNT_APPROXIMATION;
     }
 
@@ -662,7 +665,11 @@ public class TableView extends Table {
         if (exception == null) {
             return false;
         }
-        if (exception.getErrorCode() != ErrorCode.TABLE_OR_VIEW_NOT_FOUND_1) {
+        int errorCode = exception.getErrorCode();
+        if (errorCode != ErrorCode.TABLE_OR_VIEW_NOT_FOUND_1 &&
+                errorCode != ErrorCode.TABLE_OR_VIEW_NOT_FOUND_DATABASE_EMPTY_1 &&
+                errorCode != ErrorCode.TABLE_OR_VIEW_NOT_FOUND_WITH_CANDIDATES_2
+        ) {
             return false;
         }
         return exception.getMessage().contains("\"" + this.getName() + "\"");
@@ -689,7 +696,7 @@ public class TableView extends Table {
      * @return the view
      */
     public static TableView createTableViewMaybeRecursive(Schema schema, int id, String name, String querySQL,
-            ArrayList<Parameter> parameters, Column[] columnTemplates, Session session,
+            ArrayList<Parameter> parameters, Column[] columnTemplates, SessionLocal session,
             boolean literalsChecked, boolean isTableExpression, boolean isTemporary, Database db) {
 
 
@@ -763,7 +770,7 @@ public class TableView extends Table {
         // String array of length 1 is to receive extra 'output' field in addition to
         // return value
         querySQLOutput[0] = StringUtils.cache(theQuery.getPlanSQL(ADD_PLAN_INFORMATION));
-        Session session = theQuery.getSession();
+        SessionLocal session = theQuery.getSession();
         ArrayList<Expression> withExpressions = theQuery.getExpressions();
         for (int i = 0; i < withExpressions.size(); ++i) {
             Expression columnExp = withExpressions.get(i);
@@ -788,7 +795,7 @@ public class TableView extends Table {
      * @param db the database
      * @return the table
      */
-    public static Table createShadowTableForRecursiveTableExpression(boolean isTemporary, Session targetSession,
+    public static Table createShadowTableForRecursiveTableExpression(boolean isTemporary, SessionLocal targetSession,
             String cteViewName, Schema schema, List<Column> columns, Database db) {
 
         // create table data object
@@ -824,7 +831,7 @@ public class TableView extends Table {
      * @param targetSession the session
      * @param recursiveTable the table
      */
-    public static void destroyShadowTableForRecursiveExpression(boolean isTemporary, Session targetSession,
+    public static void destroyShadowTableForRecursiveExpression(boolean isTemporary, SessionLocal targetSession,
             Table recursiveTable) {
         if (recursiveTable != null) {
             if (!isTemporary) {

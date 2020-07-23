@@ -17,6 +17,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 import org.h2.engine.Constants;
+import org.h2.jdbc.JdbcException;
 import org.h2.util.StringUtils;
 
 /**
@@ -643,10 +644,11 @@ public final class DataUtils {
 
 
     /**
-     * Convert tocElement into pagePos by replacing mapId with chunkId
-     * @param chunkId
-     * @param tocElement
-     * @return
+     * Convert tocElement into pagePos by replacing mapId with chunkId.
+     *
+     * @param chunkId the chunk id
+     * @param tocElement the element
+     * @return the page position
      */
     public static long getPagePos(int chunkId, long tocElement) {
         return (tocElement & 0x3FFFFFFFFFL) | ((long) chunkId << 38);
@@ -1114,7 +1116,7 @@ public final class DataUtils {
      * @return the parsed value
      * @throws MVStoreException if parsing fails
      */
-    public static int readHexInt(Map<String, ?> map, String key, int defaultValue) {
+    static int readHexInt(Map<String, ?> map, String key, int defaultValue) {
         Object v = map.get(key);
         if (v == null) {
             return defaultValue;
@@ -1130,7 +1132,14 @@ public final class DataUtils {
         }
     }
 
-    public static byte[] parseHexBytes(Map<String, ?> map, String key) {
+    /**
+     * Parse the hex-encoded bytes of an entry in the map.
+     *
+     * @param map the map
+     * @param key the key
+     * @return the byte array, or null if not in the map
+     */
+    static byte[] parseHexBytes(Map<String, ?> map, String key) {
         Object v = map.get(key);
         if (v == null) {
             return null;
@@ -1146,7 +1155,7 @@ public final class DataUtils {
      * @param defaultValue the default
      * @return the configured value or default
      */
-    public static int getConfigParam(Map<String, ?> config, String key, int defaultValue) {
+    static int getConfigParam(Map<String, ?> config, String key, int defaultValue) {
         Object o = config.get(key);
         if (o instanceof Number) {
             return ((Number) o).intValue();
@@ -1160,4 +1169,21 @@ public final class DataUtils {
         return defaultValue;
     }
 
+    /**
+     * Convert an exception to an IO exception.
+     *
+     * @param e the root cause
+     * @return the IO exception
+     */
+    public static IOException convertToIOException(Throwable e) {
+        if (e instanceof IOException) {
+            return (IOException) e;
+        }
+        if (e instanceof JdbcException) {
+            if (e.getCause() != null) {
+                e = e.getCause();
+            }
+        }
+        return new IOException(e.toString(), e);
+    }
 }

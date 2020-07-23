@@ -54,7 +54,7 @@ public class ValueEnumBase extends Value {
      * @param ordinal the ordinal
      * @return the value
      */
-    public static ValueEnumBase get(final String label, final int ordinal) {
+    public static ValueEnumBase get(String label, int ordinal) {
         return new ValueEnumBase(label, ordinal);
     }
 
@@ -66,11 +66,6 @@ public class ValueEnumBase extends Value {
     @Override
     public long getLong() {
         return ordinal;
-    }
-
-    @Override
-    public Object getObject() {
-        return label;
     }
 
     @Override

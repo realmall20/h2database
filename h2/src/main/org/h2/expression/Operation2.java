@@ -5,7 +5,7 @@
  */
 package org.h2.expression;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.table.ColumnResolver;
 import org.h2.table.TableFilter;
 import org.h2.value.TypeInfo;
@@ -13,11 +13,11 @@ import org.h2.value.TypeInfo;
 /**
  * Operation with two arguments.
  */
-abstract class Operation2 extends Expression {
+public abstract class Operation2 extends Expression {
 
-    Expression left, right;
+    protected Expression left, right;
 
-    TypeInfo type;
+    protected TypeInfo type;
 
     protected Operation2(Expression left, Expression right) {
         this.left = left;
@@ -42,7 +42,7 @@ abstract class Operation2 extends Expression {
     }
 
     @Override
-    public void updateAggregate(Session session, int stage) {
+    public void updateAggregate(SessionLocal session, int stage) {
         left.updateAggregate(session, stage);
         right.updateAggregate(session, stage);
     }

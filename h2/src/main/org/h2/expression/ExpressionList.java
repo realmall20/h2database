@@ -5,11 +5,11 @@
  */
 package org.h2.expression;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.table.Column;
 import org.h2.table.ColumnResolver;
 import org.h2.table.TableFilter;
-import org.h2.value.ExtTypeInfoArray;
+import org.h2.value.ExtTypeInfoRow;
 import org.h2.value.TypeInfo;
 import org.h2.value.Value;
 import org.h2.value.ValueArray;
@@ -31,13 +31,12 @@ public class ExpressionList extends Expression {
     }
 
     @Override
-    public Value getValue(Session session) {
+    public Value getValue(SessionLocal session) {
         Value[] v = new Value[list.length];
         for (int i = 0; i < list.length; i++) {
             v[i] = list[i].getValue(session);
         }
-        return isArray ? ValueArray.get(((ExtTypeInfoArray) type.getExtTypeInfo()).getComponentType(), v, session)
-                : ValueRow.get(v);
+        return isArray ? ValueArray.get((TypeInfo) type.getExtTypeInfo(), v, session) : ValueRow.get(v);
     }
 
     @Override
@@ -53,7 +52,7 @@ public class ExpressionList extends Expression {
     }
 
     @Override
-    public Expression optimize(Session session) {
+    public Expression optimize(SessionLocal session) {
         boolean allConst = true;
         int count = list.length;
         for (int i = 0; i < count; i++) {
@@ -63,15 +62,8 @@ public class ExpressionList extends Expression {
             }
             list[i] = e;
         }
-        if (isArray) {
-            TypeInfo t = TypeInfo.TYPE_NULL;
-            for (int i = 0; i < count; i++) {
-                t = TypeInfo.getHigherType(t, list[i].getType());
-            }
-            type = TypeInfo.getTypeInfo(Value.ARRAY, list.length, 0, new ExtTypeInfoArray(t));
-        } else {
-            type = TypeInfo.TYPE_ROW;
-        }
+        type = isArray ? TypeInfo.getTypeInfo(Value.ARRAY, list.length, 0, TypeInfo.getHigherType(list))
+                : TypeInfo.getTypeInfo(Value.ROW, 0, 0, new ExtTypeInfoRow(list));
         if (allConst) {
             return ValueExpression.get(getValue(session));
         }
@@ -86,14 +78,14 @@ public class ExpressionList extends Expression {
     }
 
     @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
-        builder.append(isArray ? "ARRAY [" : "ROW (");
-        writeExpressions(builder, list, sqlFlags);
-        return builder.append(isArray ? ']' : ')');
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
+        return isArray //
+                ? writeExpressions(builder.append("ARRAY ["), list, sqlFlags).append(']')
+                : writeExpressions(builder.append("ROW ("), list, sqlFlags).append(')');
     }
 
     @Override
-    public void updateAggregate(Session session, int stage) {
+    public void updateAggregate(SessionLocal session, int stage) {
         for (Expression e : list) {
             e.updateAggregate(session, stage);
         }
@@ -119,7 +111,7 @@ public class ExpressionList extends Expression {
     }
 
     @Override
-    public Expression[] getExpressionColumns(Session session) {
+    public Expression[] getExpressionColumns(SessionLocal session) {
         ExpressionColumn[] expr = new ExpressionColumn[list.length];
         for (int i = 0; i < list.length; i++) {
             Expression e = list[i];

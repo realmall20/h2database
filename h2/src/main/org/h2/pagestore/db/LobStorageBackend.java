@@ -19,6 +19,7 @@ import org.h2.api.ErrorCode;
 import org.h2.engine.Database;
 import org.h2.jdbc.JdbcConnection;
 import org.h2.message.DbException;
+import org.h2.mvstore.DataUtils;
 import org.h2.store.CountingReaderInputStream;
 import org.h2.store.LobStorageFrontend;
 import org.h2.store.LobStorageInterface;
@@ -140,7 +141,7 @@ public class LobStorageBackend implements LobStorageInterface {
                     rs = prep.executeQuery();
                     if (rs.next()) {
                         create = false;
-                        prep = initConn.prepareStatement("SELECT COLUMN_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE "
+                        prep = initConn.prepareStatement("SELECT DATA_TYPE FROM INFORMATION_SCHEMA.COLUMNS WHERE "
                                 + "TABLE_SCHEMA=? AND TABLE_NAME=? AND COLUMN_NAME=?");
                         prep.setString(1, "INFORMATION_SCHEMA");
                         prep.setString(2, "LOB_DATA");
@@ -346,7 +347,7 @@ public class LobStorageBackend implements LobStorageInterface {
                 }
             }
         } catch (SQLException e) {
-            throw DbException.convertToIOException(e);
+            throw DataUtils.convertToIOException(e);
         }
     }
 
@@ -787,7 +788,7 @@ if (lobMapIndex >= lobMapBlocks.length) {
                 lobMapIndex++;
                 bufferPos = 0;
             } catch (SQLException e) {
-                throw DbException.convertToIOException(e);
+                throw DataUtils.convertToIOException(e);
             }
         }
 

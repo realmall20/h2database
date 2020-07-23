@@ -9,13 +9,12 @@ import java.util.ArrayList;
 
 import org.h2.api.ErrorCode;
 import org.h2.engine.Database;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.expression.ExpressionColumn;
 import org.h2.message.DbException;
 import org.h2.result.LocalResult;
 import org.h2.table.Column;
-import org.h2.value.TypeInfo;
 import org.h2.value.Value;
 import org.h2.value.ValueCollectionBase;
 import org.h2.value.ValueInteger;
@@ -34,7 +33,7 @@ public class TableFunction extends Function {
     }
 
     @Override
-    public Value getValue(Session session) {
+    public Value getValue(SessionLocal session) {
         return getTable(session, false);
     }
 
@@ -46,27 +45,28 @@ public class TableFunction extends Function {
     }
 
     @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
         if (info.type == UNNEST) {
-            super.getSQL(builder, sqlFlags);
+            super.getUnenclosedSQL(builder, sqlFlags);
             if (args.length < columns.length) {
                 builder.append(" WITH ORDINALITY");
             }
-            return builder;
-        }
-        builder.append(getName()).append('(');
-        for (int i = 0; i < args.length; i++) {
-            if (i > 0) {
-                builder.append(", ");
+        } else {
+            builder.append(getName()).append('(');
+            for (int i = 0; i < args.length; i++) {
+                if (i > 0) {
+                    builder.append(", ");
+                }
+                builder.append(columns[i].getCreateSQL()).append('=');
+                args[i].getUnenclosedSQL(builder, sqlFlags);
             }
-            builder.append(columns[i].getCreateSQL()).append('=');
-            args[i].getSQL(builder, sqlFlags);
+            builder.append(')');
         }
-        return builder.append(')');
+        return builder;
     }
 
     @Override
-    public ValueResultSet getValueForColumnList(Session session,
+    public ValueResultSet getValueForColumnList(SessionLocal session,
             Expression[] nullArgs) {
         return getTable(session, true);
     }
@@ -75,7 +75,7 @@ public class TableFunction extends Function {
         this.columns = columns.toArray(new Column[0]);
     }
 
-    private ValueResultSet getTable(Session session, boolean onlyColumnList) {
+    private ValueResultSet getTable(SessionLocal session, boolean onlyColumnList) {
         int totalColumns = columns.length;
         Expression[] header = new Expression[totalColumns];
         Database db = session.getDatabase();
@@ -106,7 +106,7 @@ public class TableFunction extends Function {
                 } else {
                     int type = v.getValueType();
                     if (type != Value.ARRAY && type != Value.ROW) {
-                        v = v.convertTo(TypeInfo.TYPE_ARRAY);
+                        v = v.convertToAnyArray(session);
                     }
                     Value[] l = ((ValueCollectionBase) v).getList();
                     list[i] = l;
@@ -140,7 +140,7 @@ public class TableFunction extends Function {
     }
 
     @Override
-    public Expression[] getExpressionColumns(Session session) {
+    public Expression[] getExpressionColumns(SessionLocal session) {
         return getExpressionColumns(session, getValueForColumnList(session, null).getResult());
     }
 

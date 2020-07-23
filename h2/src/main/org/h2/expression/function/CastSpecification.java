@@ -5,7 +5,7 @@
  */
 package org.h2.expression.function;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.expression.Operation1;
 import org.h2.expression.TypedValueExpression;
@@ -35,7 +35,7 @@ public class CastSpecification extends Operation1 {
     }
 
     @Override
-    public Value getValue(Session session) {
+    public Value getValue(SessionLocal session) {
         Value v = arg.getValue(session).castTo(type, session);
         if (domain != null) {
             domain.checkConstraints(session, v);
@@ -44,7 +44,7 @@ public class CastSpecification extends Operation1 {
     }
 
     @Override
-    public Expression optimize(Session session) {
+    public Expression optimize(SessionLocal session) {
         arg = arg.optimize(session);
         if (arg.isConstant()) {
             Value v = getValue(session);
@@ -53,6 +53,11 @@ public class CastSpecification extends Operation1 {
             }
         }
         return this;
+    }
+
+    @Override
+    public boolean isConstant() {
+        return arg instanceof ValueExpression && canOptimizeCast(arg.getType().getValueType(), type.getValueType());
     }
 
     private static boolean canOptimizeCast(int src, int dst) {
@@ -97,15 +102,10 @@ public class CastSpecification extends Operation1 {
     }
 
     @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
         builder.append("CAST(");
-        arg.getSQL(builder, arg instanceof ValueExpression ? sqlFlags | NO_CASTS : sqlFlags).append(" AS ");
-        if (domain != null) {
-            domain.getSQL(builder, sqlFlags);
-        } else {
-            type.getSQL(builder);
-        }
-        return builder.append(')');
+        arg.getUnenclosedSQL(builder, arg instanceof ValueExpression ? sqlFlags | NO_CASTS : sqlFlags).append(" AS ");
+        return (domain != null ? domain : type).getSQL(builder, sqlFlags).append(')');
     }
 
 }

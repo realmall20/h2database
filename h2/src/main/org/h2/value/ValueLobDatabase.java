@@ -46,7 +46,6 @@ public final class ValueLobDatabase extends ValueLob {
      * @param handler the data handler
      * @param tableId the table id
      * @param id the lob id
-     * @param hmac the message authentication code
      * @param precision the precision (number of bytes / characters)
      * @return the value
      */
@@ -112,7 +111,7 @@ public final class ValueLobDatabase extends ValueLob {
             return super.compareTypeSafe(v, mode, provider);
         }
         ValueLobDatabase v2 = (ValueLobDatabase) v;
-        if (v2 != null && lobId == v2.lobId) {
+        if (lobId == v2.lobId) {
             return 0;
         }
         return compare(this, v2);

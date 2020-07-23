@@ -6,13 +6,12 @@
 package org.h2.expression;
 
 import org.h2.api.ErrorCode;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.condition.Comparison;
 import org.h2.message.DbException;
 import org.h2.table.Column;
 import org.h2.value.TypeInfo;
 import org.h2.value.Value;
-import org.h2.value.ValueBoolean;
 import org.h2.value.ValueNull;
 import org.h2.value.ValueVarchar;
 
@@ -30,7 +29,7 @@ public class Parameter extends Operation0 implements ParameterInterface {
     }
 
     @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
         return builder.append('?').append(index + 1);
     }
 
@@ -55,7 +54,7 @@ public class Parameter extends Operation0 implements ParameterInterface {
     }
 
     @Override
-    public Value getValue(Session session) {
+    public Value getValue(SessionLocal session) {
         return getParamValue();
     }
 
@@ -78,7 +77,7 @@ public class Parameter extends Operation0 implements ParameterInterface {
     }
 
     @Override
-    public Expression optimize(Session session) {
+    public Expression optimize(SessionLocal session) {
         if (session.getDatabase().getMode().treatEmptyStringsAsNull) {
             if (value instanceof ValueVarchar && value.getString().isEmpty()) {
                 value = ValueNull.INSTANCE;
@@ -122,8 +121,8 @@ public class Parameter extends Operation0 implements ParameterInterface {
     }
 
     @Override
-    public Expression getNotIfPossible(Session session) {
-        return new Comparison(Comparison.EQUAL, this, ValueExpression.get(ValueBoolean.FALSE));
+    public Expression getNotIfPossible(SessionLocal session) {
+        return new Comparison(Comparison.EQUAL, this, ValueExpression.FALSE, false);
     }
 
     public void setColumn(Column column) {

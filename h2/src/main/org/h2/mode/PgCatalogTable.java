@@ -7,9 +7,11 @@ package org.h2.mode;
 
 import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 
+import org.h2.constraint.Constraint;
 import org.h2.engine.Constants;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.engine.User;
 import org.h2.index.Index;
 import org.h2.message.DbException;
@@ -21,9 +23,12 @@ import org.h2.server.pg.PgServer;
 import org.h2.table.Column;
 import org.h2.table.MetaTable;
 import org.h2.table.Table;
+import org.h2.util.StringUtils;
 import org.h2.util.Utils;
 import org.h2.value.DataType;
+import org.h2.value.TypeInfo;
 import org.h2.value.Value;
+import org.h2.value.ValueArray;
 import org.h2.value.ValueBoolean;
 import org.h2.value.ValueDouble;
 import org.h2.value.ValueInteger;
@@ -44,7 +49,9 @@ public class PgCatalogTable extends MetaTable {
 
     private static final int PG_CLASS = PG_AUTHID + 1;
 
-    private static final int PG_DATABASE = PG_CLASS + 1;
+    private static final int PG_CONSTRAINT = PG_CLASS + 1;
+
+    private static final int PG_DATABASE = PG_CONSTRAINT + 1;
 
     private static final int PG_DESCRIPTION = PG_DATABASE + 1;
 
@@ -70,17 +77,22 @@ public class PgCatalogTable extends MetaTable {
 
     private static final int PG_USER = PG_TYPE + 1;
 
-    private static final int META_TABLE_TYPE_COUNT = PG_USER + 1;
-
     /**
-     * Get the number of meta table types. Supported meta table types are 0 ..
-     * this value - 1.
-     *
-     * @return the number of meta table types
+     * The number of meta table types. Supported meta table types are
+     * {@code 0..META_TABLE_TYPE_COUNT - 1}.
      */
-    public static int getMetaTableTypeCount() {
-        return META_TABLE_TYPE_COUNT;
-    }
+    public static final int META_TABLE_TYPE_COUNT = PG_USER + 1;
+
+    private static final Object[][] PG_EXTRA_TYPES = {
+            { 18, "char", 1, 0 },
+            { 19, "name", 64, 18 },
+            { 22, "int2vector", -1, 21 },
+            { 24, "regproc", 4, 0 },
+            { PgServer.PG_TYPE_INT2_ARRAY, "_int2", -1, PgServer.PG_TYPE_INT2 },
+            { PgServer.PG_TYPE_INT4_ARRAY, "_int4", -1, PgServer.PG_TYPE_INT4 },
+            { PgServer.PG_TYPE_VARCHAR_ARRAY, "_varchar", -1, PgServer.PG_TYPE_VARCHAR },
+            { 2205, "regclass", 4, 0 },
+    };
 
     /**
      * Create a new metadata table.
@@ -100,7 +112,7 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_AM");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "AMNAME VARCHAR_IGNORECASE" //
+                    "AMNAME VARCHAR" //
             );
             break;
         case PG_ATTRDEF:
@@ -132,7 +144,7 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_AUTHID");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "ROLNAME VARCHAR_IGNORECASE", //
+                    "ROLNAME VARCHAR", //
                     "ROLSUPER BOOLEAN", //
                     "ROLINHERIT BOOLEAN", //
                     "ROLCREATEROLE BOOLEAN", //
@@ -149,7 +161,7 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_CLASS");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "RELNAME VARCHAR_IGNORECASE", //
+                    "RELNAME VARCHAR", //
                     "RELNAMESPACE INTEGER", //
                     "RELKIND CHAR", //
                     "RELAM INTEGER", //
@@ -163,16 +175,27 @@ public class PgCatalogTable extends MetaTable {
                     "RELTRIGGERS INTEGER" //
             );
             break;
+        case PG_CONSTRAINT:
+            setMetaTableName("PG_CONSTRAINT");
+            cols = createColumns( //
+                    "OID INTEGER", //
+                    "CONNAME VARCHAR", //
+                    "CONTYPE VARCHAR", //
+                    "CONRELID INTEGER", //
+                    "CONFRELID INTEGER", //
+                    "CONKEY SMALLINT ARRAY" //
+            );
+            break;
         case PG_DATABASE:
             setMetaTableName("PG_DATABASE");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "DATNAME VARCHAR_IGNORECASE", //
+                    "DATNAME VARCHAR", //
                     "ENCODING INTEGER", //
                     "DATLASTSYSOID INTEGER", //
                     "DATALLOWCONN BOOLEAN", //
                     "DATCONFIG TEXT ARRAY", //
-                    "DATACL ARRAY", // ACLITEM[]
+                    "DATACL VARCHAR ARRAY", // ACLITEM[]
                     "DATDBA INTEGER", //
                     "DATTABLESPACE INTEGER" //
             );
@@ -183,14 +206,14 @@ public class PgCatalogTable extends MetaTable {
                     "OBJOID INTEGER", //
                     "OBJSUBID INTEGER", //
                     "CLASSOID INTEGER", //
-                    "DESCRIPTION VARCHAR_IGNORECASE" //
+                    "DESCRIPTION VARCHAR" //
             );
             break;
         case PG_GROUP:
             setMetaTableName("PG_GROUP");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "GRONAME VARCHAR_IGNORECASE" //
+                    "GRONAME VARCHAR" //
             );
             break;
         case PG_INDEX:
@@ -202,7 +225,7 @@ public class PgCatalogTable extends MetaTable {
                     "INDISCLUSTERED BOOLEAN", //
                     "INDISUNIQUE BOOLEAN", //
                     "INDISPRIMARY BOOLEAN", //
-                    "INDEXPRS VARCHAR_IGNORECASE", //
+                    "INDEXPRS VARCHAR", //
                     "INDKEY INT ARRAY", //
                     "INDPRED" //
             );
@@ -219,14 +242,14 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_NAMESPACE");
             cols = createColumns( //
                     "ID INTEGER", //
-                    "NSPNAME VARCHAR_IGNORECASE" //
+                    "NSPNAME VARCHAR" //
             );
             break;
         case PG_PROC:
             setMetaTableName("PG_PROC");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "PRONAME VARCHAR_IGNORECASE", //
+                    "PRONAME VARCHAR", //
                     "PRORETTYPE INTEGER", //
                     "PROARGTYPES INTEGER ARRAY", //
                     "PRONAMESPACE INTEGER" //
@@ -236,7 +259,7 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_ROLES");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "ROLNAME VARCHAR_IGNORECASE", //
+                    "ROLNAME VARCHAR", //
                     "ROLSUPER CHAR", //
                     "ROLCREATEROLE CHAR", //
                     "ROLCREATEDB CHAR" //
@@ -246,18 +269,18 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_SETTINGS");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "NAME VARCHAR_IGNORECASE", //
-                    "SETTING VARCHAR_IGNORECASE" //
+                    "NAME VARCHAR", //
+                    "SETTING VARCHAR" //
             );
             break;
         case PG_TABLESPACE:
             setMetaTableName("PG_TABLESPACE");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "SPCNAME VARCHAR_IGNORECASE", //
-                    "SPCLOCATION VARCHAR_IGNORECASE", //
+                    "SPCNAME VARCHAR", //
+                    "SPCLOCATION VARCHAR", //
                     "SPCOWNER INTEGER", //
-                    "SPCACL ARRAY" // ACLITEM[]
+                    "SPCACL VARCHAR ARRAY" // ACLITEM[]
             );
             break;
         case PG_TRIGGER:
@@ -270,7 +293,7 @@ public class PgCatalogTable extends MetaTable {
                     "TGNARGS INTEGER", //
                     "TGDEFERRABLE BOOLEAN", //
                     "TGINITDEFERRED BOOLEAN", //
-                    "TGCONSTRNAME VARCHAR_IGNORECASE", //
+                    "TGCONSTRNAME VARCHAR", //
                     "TGRELID INTEGER" //
             );
             break;
@@ -278,10 +301,13 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_TYPE");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "TYPNAME VARCHAR_IGNORECASE", //
+                    "TYPNAME VARCHAR", //
                     "TYPNAMESPACE INTEGER", //
                     "TYPLEN INTEGER", //
                     "TYPTYPE VARCHAR", //
+                    "TYPDELIM VARCHAR", //
+                    "TYPRELID INTEGER", //
+                    "TYPELEM INTEGER", //
                     "TYPBASETYPE INTEGER", //
                     "TYPTYPMOD INTEGER", //
                     "TYPNOTNULL BOOLEAN", //
@@ -292,7 +318,7 @@ public class PgCatalogTable extends MetaTable {
             setMetaTableName("PG_USER");
             cols = createColumns( //
                     "OID INTEGER", //
-                    "USENAME VARCHAR_IGNORECASE", //
+                    "USENAME VARCHAR", //
                     "USECREATEDB BOOLEAN", //
                     "USESUPER BOOLEAN" //
             );
@@ -306,7 +332,7 @@ public class PgCatalogTable extends MetaTable {
     }
 
     @Override
-    public ArrayList<Row> generateRows(Session session, SearchRow first, SearchRow last) {
+    public ArrayList<Row> generateRows(SessionLocal session, SearchRow first, SearchRow last) {
         ArrayList<Row> rows = Utils.newSmallArrayList();
         String catalog = database.getShortName();
         boolean admin = session.getUser().isAdmin();
@@ -325,53 +351,38 @@ public class PgCatalogTable extends MetaTable {
         case PG_ATTRDEF:
             break;
         case PG_ATTRIBUTE:
-            for (Table table : getAllTables(session)) {
-                if (hideTable(table, session)) {
-                    continue;
-                }
-                Column[] cols = table.getColumns();
-                int tableId = table.getId();
-                for (int i = 0; i < cols.length;) {
-                    Column column = cols[i++];
-                    addAttribute(session, rows, tableId * 10_000 + i, tableId, table, column, i);
-                }
-                for (Index index : table.getIndexes()) {
-                    if (index.getCreateSQL() == null) {
-                        continue;
+            for (Schema schema : database.getAllSchemas()) {
+                for (Table table : schema.getAllTablesAndViews(session)) {
+                    if (!hideTable(table, session)) {
+                        pgAttribute(session, rows, table);
                     }
-                    cols = index.getColumns();
-                    for (int i = 0; i < cols.length;) {
-                        Column column = cols[i++];
-                        int indexId = index.getId();
-                        addAttribute(session, rows, 1_000_000 * indexId + tableId * 10_000 + i, indexId, table, column,
-                                i);
-                    }
+                }
+            }
+            for (Table table: session.getLocalTempTables()) {
+                if (!hideTable(table, session)) {
+                    pgAttribute(session, rows, table);
                 }
             }
             break;
         case PG_AUTHID:
             break;
-        case PG_CLASS: {
-            for (Table table : getAllTables(session)) {
-                if (hideTable(table, session)) {
-                    continue;
-                }
-                ArrayList<TriggerObject> triggers = table.getTriggers();
-                addClass(session, rows, table.getId(), table.getName(), table.getSchema().getId(),
-                        table.isView() ? "v" : "r", false, triggers != null ? triggers.size() : 0);
-                ArrayList<Index> indexes = table.getIndexes();
-                if (indexes != null) {
-                    for (Index index : indexes) {
-                        if (index.getCreateSQL() == null) {
-                            continue;
-                        }
-                        addClass(session, rows, index.getId(), index.getName(), index.getSchema().getId(), "i", true,
-                                0);
+        case PG_CLASS:
+            for (Schema schema : database.getAllSchemas()) {
+                for (Table table : schema.getAllTablesAndViews(session)) {
+                    if (!hideTable(table, session)) {
+                        pgClass(session, rows, table);
                     }
                 }
             }
+            for (Table table: session.getLocalTempTables()) {
+                if (!hideTable(table, session)) {
+                    pgClass(session, rows, table);
+                }
+            }
             break;
-        }
+        case PG_CONSTRAINT:
+            pgConstraint(session, rows);
+            break;
         case PG_DATABASE: {
             int uid = Integer.MAX_VALUE;
             for (User u : database.getAllUsers()) {
@@ -481,11 +492,12 @@ public class PgCatalogTable extends MetaTable {
             break;
         case PG_TYPE: {
             HashSet<Integer> types = new HashSet<>();
-            for (DataType t : DataType.getTypes()) {
-                if (t.hidden || t.sqlType == Value.NULL) {
+            for (int i = 1, l = Value.TYPE_COUNT; i < l; i++) {
+                DataType t = DataType.getDataType(i);
+                if (t.type == Value.ARRAY) {
                     continue;
                 }
-                int pgType = PgServer.convertType(t.sqlType);
+                int pgType = PgServer.convertType(TypeInfo.getTypeInfo(t.type));
                 if (pgType == PgServer.PG_TYPE_UNKNOWN || !types.add(pgType)) {
                     continue;
                 }
@@ -493,13 +505,19 @@ public class PgCatalogTable extends MetaTable {
                         // OID
                         ValueInteger.get(pgType),
                         // TYPNAME
-                        t.name,
+                        Value.getTypeName(t.type),
                         // TYPNAMESPACE
                         ValueInteger.get(Constants.PG_CATALOG_SCHEMA_ID),
                         // TYPLEN
                         ValueInteger.get(-1),
                         // TYPTYPE
-                        "c",
+                        "b",
+                        // TYPDELIM
+                        ",",
+                        // TYPRELID
+                        ValueInteger.get(0),
+                        // TYPELEM
+                        ValueInteger.get(0),
                         // TYPBASETYPE
                         ValueInteger.get(0),
                         // TYPTYPMOD
@@ -509,8 +527,7 @@ public class PgCatalogTable extends MetaTable {
                         // TYPINPUT
                         null);
             }
-            for (Object[] pgType : new Object[][] { { 19, "name", -1, "c" }, { 0, "null", -1, "c" },
-                    { 22, "int2vector", -1, "c" }, { 2205, "regproc", 4, "b" } }) {
+            for (Object[] pgType : PG_EXTRA_TYPES) {
                 add(session, rows,
                         // OID
                         ValueInteger.get((int) pgType[0]),
@@ -521,7 +538,13 @@ public class PgCatalogTable extends MetaTable {
                         // TYPLEN
                         ValueInteger.get((int) pgType[2]),
                         // TYPTYPE
-                        pgType[3],
+                        "b",
+                        // TYPDELIM
+                        ",",
+                        // TYPRELID
+                        ValueInteger.get(0),
+                        // TYPELEM
+                        ValueInteger.get((int) pgType[3]),
                         // TYPBASETYPE
                         ValueInteger.get(0),
                         // TYPTYPMOD
@@ -557,7 +580,80 @@ public class PgCatalogTable extends MetaTable {
 
     }
 
-    private void addAttribute(Session session, ArrayList<Row> rows, int id, int relId, Table table, Column column,
+    private void pgAttribute(SessionLocal session, ArrayList<Row> rows, Table table) {
+        Column[] cols = table.getColumns();
+        int tableId = table.getId();
+        for (int i = 0; i < cols.length;) {
+            Column column = cols[i++];
+            addAttribute(session, rows, tableId * 10_000 + i, tableId, table, column, i);
+        }
+        for (Index index : table.getIndexes()) {
+            if (index.getCreateSQL() == null) {
+                continue;
+            }
+            cols = index.getColumns();
+            for (int i = 0; i < cols.length;) {
+                Column column = cols[i++];
+                int indexId = index.getId();
+                addAttribute(session, rows, 1_000_000 * indexId + tableId * 10_000 + i, indexId, table, column,
+                        i);
+            }
+        }
+    }
+
+    private void pgClass(SessionLocal session, ArrayList<Row> rows, Table table) {
+        ArrayList<TriggerObject> triggers = table.getTriggers();
+        addClass(session, rows, table.getId(), table.getName(), table.getSchema().getId(),
+                table.isView() ? "v" : "r", false, triggers != null ? triggers.size() : 0);
+        ArrayList<Index> indexes = table.getIndexes();
+        if (indexes != null) {
+            for (Index index : indexes) {
+                if (index.getCreateSQL() == null) {
+                    continue;
+                }
+                addClass(session, rows, index.getId(), index.getName(), index.getSchema().getId(), "i", true,
+                        0);
+            }
+        }
+    }
+
+    private void pgConstraint(SessionLocal session, ArrayList<Row> rows) {
+        for (Schema schema : database.getAllSchemasNoMeta()) {
+            for (Constraint constraint : schema.getAllConstraints()) {
+                Constraint.Type constraintType = constraint.getConstraintType();
+                if (constraintType == Constraint.Type.DOMAIN) {
+                    continue;
+                }
+                Table table = constraint.getTable();
+                if (hideTable(table, session)) {
+                    continue;
+                }
+                List<ValueSmallint> conkey = new ArrayList<>();
+                for (Column column : constraint.getReferencedColumns(table)) {
+                    conkey.add(ValueSmallint.get((short) (column.getColumnId() + 1)));
+                }
+                Table refTable = constraint.getRefTable();
+                add(session,
+                        rows,
+                        // OID
+                        ValueInteger.get(constraint.getId()),
+                        // CONNAME
+                        constraint.getName(),
+                        // CONTYPE
+                        StringUtils.toLowerEnglish(constraintType.getSqlName().substring(0, 1)),
+                        // CONRELID
+                        ValueInteger.get(table.getId()),
+                        // CONFRELID
+                        ValueInteger.get(refTable != null && refTable != table
+                                && !hideTable(refTable, session) ? table.getId() : 0),
+                        // CONKEY
+                        ValueArray.get(TypeInfo.TYPE_SMALLINT, conkey.toArray(Value.EMPTY_VALUES), null)
+                );
+            }
+        }
+    }
+
+    private void addAttribute(SessionLocal session, ArrayList<Row> rows, int id, int relId, Table table, Column column,
             int ordinal) {
         long precision = column.getType().getPrecision();
         add(session, rows,
@@ -568,7 +664,7 @@ public class PgCatalogTable extends MetaTable {
                 // ATTNAME
                 column.getName(),
                 // ATTTYPID
-                ValueInteger.get(PgServer.convertType(DataType.convertTypeToSQLType(column.getType().getValueType()))),
+                ValueInteger.get(PgServer.convertType(column.getType())),
                 // ATTLEN
                 ValueInteger.get(precision > 255 ? -1 : (int) precision),
                 // ATTNUM
@@ -583,7 +679,7 @@ public class PgCatalogTable extends MetaTable {
                 ValueBoolean.FALSE);
     }
 
-    private void addClass(Session session, ArrayList<Row> rows, int id, String name, int schema, String kind,
+    private void addClass(SessionLocal session, ArrayList<Row> rows, int id, String name, int schema, String kind,
             boolean index, int triggers) {
         add(session, rows,
                 // OID

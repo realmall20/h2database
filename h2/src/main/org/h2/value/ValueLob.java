@@ -9,7 +9,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.Reader;
 import org.h2.engine.CastDataProvider;
-import org.h2.engine.Constants;
 import org.h2.engine.SysProperties;
 import org.h2.message.DbException;
 import org.h2.store.DataHandler;
@@ -17,14 +16,13 @@ import org.h2.store.RangeInputStream;
 import org.h2.store.RangeReader;
 import org.h2.util.Bits;
 import org.h2.util.IOUtils;
-import org.h2.util.MathUtils;
 import org.h2.util.StringUtils;
 import org.h2.util.Utils;
 
 /**
- * A implementation of the BLOB and CLOB data types. Small objects are kept in
- * memory and stored in the record. Large objects are either stored in the
- * database, or in temporary files.
+ * A implementation of the BINARY LARGE OBJECT and CHARACTER LARGE OBJECT data
+ * types. Small objects are kept in memory and stored in the record. Large
+ * objects are either stored in the database, or in temporary files.
  */
 public class ValueLob extends Value {
 
@@ -209,7 +207,7 @@ public class ValueLob extends Value {
     public TypeInfo getType() {
         TypeInfo type = this.type;
         if (type == null) {
-            this.type = type = new TypeInfo(valueType, precision, 0, MathUtils.convertLongToInt(precision), null);
+            this.type = type = new TypeInfo(valueType, precision, 0, null);
         }
         return type;
     }
@@ -267,14 +265,6 @@ public class ValueLob extends Value {
         }
         ValueLob v2 = (ValueLob) v;
         return compare(this, v2);
-    }
-
-    @Override
-    public Object getObject() {
-        if (valueType == Value.CLOB) {
-            return getReader();
-        }
-        return getInputStream();
     }
 
     @Override
@@ -371,28 +361,6 @@ public class ValueLob extends Value {
      */
     public ValueLob copyToResult() {
         return this;
-    }
-
-    protected static int getBufferSize(DataHandler handler, boolean compress, long remaining) {
-        if (remaining < 0 || remaining > Integer.MAX_VALUE) {
-            remaining = Integer.MAX_VALUE;
-        }
-        int inplace = handler.getMaxLengthInplaceLob();
-        long m = compress ? Constants.IO_BUFFER_SIZE_COMPRESS : Constants.IO_BUFFER_SIZE;
-        if (m < remaining && m <= inplace) {
-            // using "1L" to force long arithmetic because
-            // inplace could be Integer.MAX_VALUE
-            m = Math.min(remaining, inplace + 1L);
-            // the buffer size must be bigger than the inplace lob, otherwise we
-            // can't know if it must be stored in-place or not
-            m = MathUtils.roundUpLong(m, Constants.IO_BUFFER_SIZE);
-        }
-        m = Math.min(remaining, m);
-        m = MathUtils.convertLongToInt(m);
-        if (m < 0) {
-            m = Integer.MAX_VALUE;
-        }
-        return (int) m;
     }
 
     /**

@@ -137,7 +137,16 @@ public interface DbObject extends HasSQL {
     String getCreateSQLForCopy(Table table, String quotedName);
 
     /**
-     * Construct the original CREATE ... SQL statement for this object.
+     * Construct the CREATE ... SQL statement for this object for meta table.
+     *
+     * @return the SQL statement
+     */
+    default String getCreateSQLForMeta() {
+        return getCreateSQL();
+    }
+
+    /**
+     * Construct the CREATE ... SQL statement for this object.
      *
      * @return the SQL statement
      */
@@ -164,7 +173,7 @@ public interface DbObject extends HasSQL {
      *
      * @param session the session
      */
-    void removeChildrenAndResources(Session session);
+    void removeChildrenAndResources(SessionLocal session);
 
     /**
      * Check if renaming is allowed. Does nothing when allowed.

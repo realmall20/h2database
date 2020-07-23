@@ -13,7 +13,7 @@ import java.sql.Statement;
 import java.util.ArrayList;
 import org.h2.api.ErrorCode;
 import org.h2.command.CommandInterface;
-import org.h2.engine.SessionInterface;
+import org.h2.engine.Session;
 import org.h2.engine.SysProperties;
 import org.h2.message.DbException;
 import org.h2.message.TraceObject;
@@ -30,7 +30,7 @@ import org.h2.util.Utils;
 public class JdbcStatement extends TraceObject implements Statement, JdbcStatementBackwardsCompat {
 
     protected JdbcConnection conn;
-    protected SessionInterface session;
+    protected Session session;
     protected JdbcResultSet resultSet;
     protected int maxRows;
     protected int fetchSize = SysProperties.SERVER_RESULT_SET_FETCH_SIZE;
@@ -38,21 +38,18 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
     protected JdbcResultSet generatedKeys;
     protected final int resultSetType;
     protected final int resultSetConcurrency;
-    protected final boolean closedByResultSet;
     private volatile CommandInterface executingCommand;
     private int lastExecutedCommandType;
     private ArrayList<String> batchCommands;
     private boolean escapeProcessing = true;
     private volatile boolean cancelled;
 
-    JdbcStatement(JdbcConnection conn, int id, int resultSetType,
-            int resultSetConcurrency, boolean closeWithResultSet) {
+    JdbcStatement(JdbcConnection conn, int id, int resultSetType, int resultSetConcurrency) {
         this.conn = conn;
         this.session = conn.getSession();
         setTrace(session.getTrace(), TraceObject.STATEMENT, id);
         this.resultSetType = resultSetType;
         this.resultSetConcurrency = resultSetConcurrency;
-        this.closedByResultSet = closeWithResultSet;
     }
 
     /**
@@ -92,8 +89,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
                 if (!lazy) {
                     command.close();
                 }
-                resultSet = new JdbcResultSet(conn, this, command, result, id,
-                        closedByResultSet, scrollable, updatable);
+                resultSet = new JdbcResultSet(conn, this, command, result, id, scrollable, updatable);
             }
             return resultSet;
         } catch (Exception e) {
@@ -157,7 +153,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
         }
     }
 
-    private int executeUpdateInternal(String sql, Object generatedKeysRequest) throws SQLException {
+    private int executeUpdateInternal(String sql, Object generatedKeysRequest) {
         checkClosed();
         closeOldResultSet();
         sql = JdbcConnection.translateSQL(sql, escapeProcessing);
@@ -171,8 +167,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
                 ResultInterface gk = result.getGeneratedKeys();
                 if (gk != null) {
                     int id = getNextId(TraceObject.RESULT_SET);
-                    generatedKeys = new JdbcResultSet(conn, this, command, gk, id,
-                            false, true, false);
+                    generatedKeys = new JdbcResultSet(conn, this, command, gk, id, true, false);
                 }
             } finally {
                 setExecutingStatement(null);
@@ -204,7 +199,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
         }
     }
 
-    private boolean executeInternal(String sql, Object generatedKeysRequest) throws SQLException {
+    private boolean executeInternal(String sql, Object generatedKeysRequest) {
         int id = getNextId(TraceObject.RESULT_SET);
         checkClosed();
         closeOldResultSet();
@@ -221,8 +216,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
                     boolean updatable = resultSetConcurrency == ResultSet.CONCUR_UPDATABLE;
                     ResultInterface result = command.executeQuery(maxRows, scrollable);
                     lazy = result.isLazy();
-                    resultSet = new JdbcResultSet(conn, this, command, result, id,
-                            closedByResultSet, scrollable, updatable);
+                    resultSet = new JdbcResultSet(conn, this, command, result, id, scrollable, updatable);
                 } else {
                     returnsResultSet = false;
                     ResultWithGeneratedKeys result = command.executeUpdate(
@@ -230,8 +224,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
                     updateCount = result.getUpdateCount();
                     ResultInterface gk = result.getGeneratedKeys();
                     if (gk != null) {
-                        generatedKeys = new JdbcResultSet(conn, this, command, gk, id,
-                                false, true, false);
+                        generatedKeys = new JdbcResultSet(conn, this, command, gk, id, true, false);
                     }
                 }
             } finally {
@@ -847,7 +840,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
             checkClosed();
             if (generatedKeys == null) {
                 if (!conn.scopeGeneratedKeys() && session.isSupportsGeneratedKeys()) {
-                    generatedKeys = new JdbcResultSet(conn, this, null, new SimpleResult(), id, false, true, false);
+                    generatedKeys = new JdbcResultSet(conn, this, null, new SimpleResult(), id, true, false);
                 } else {
                     // Compatibility mode or an old server, so use SCOPE_IDENTITY()
                     generatedKeys = conn.getGeneratedKeys(this, id);
@@ -1190,15 +1183,13 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
      * INTERNAL.
      * Close and old result set if there is still one open.
      */
-    protected void closeOldResultSet() throws SQLException {
+    protected void closeOldResultSet() {
         try {
-            if (!closedByResultSet) {
-                if (resultSet != null) {
-                    resultSet.closeInternal();
-                }
-                if (generatedKeys != null) {
-                    generatedKeys.closeInternal();
-                }
+            if (resultSet != null) {
+                resultSet.closeInternal();
+            }
+            if (generatedKeys != null) {
+                generatedKeys.closeInternal();
             }
         } finally {
             cancelled = false;
@@ -1362,7 +1353,7 @@ public class JdbcStatement extends TraceObject implements Statement, JdbcStateme
      */
     @Override
     public boolean isSimpleIdentifier(String identifier) throws SQLException {
-        SessionInterface.StaticSettings settings;
+        Session.StaticSettings settings;
         try {
             checkClosed();
             settings = conn.getStaticSettings();

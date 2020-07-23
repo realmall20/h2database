@@ -5,7 +5,7 @@
  */
 package org.h2.expression;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.value.TypeInfo;
 import org.h2.value.Value;
 import org.h2.value.ValueNull;
@@ -20,21 +20,25 @@ public class UnaryOperation extends Operation1 {
     }
 
     @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
-        // don't remove the space, otherwise it might end up some thing like
-        // --1 which is a line remark
-        builder.append("(- ");
-        return arg.getSQL(builder, sqlFlags).append(')');
+    public boolean needParentheses() {
+        return true;
     }
 
     @Override
-    public Value getValue(Session session) {
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
+        // don't remove the space, otherwise it might end up some thing like
+        // --1 which is a line remark
+        return arg.getSQL(builder.append("- "), sqlFlags, AUTO_PARENTHESES);
+    }
+
+    @Override
+    public Value getValue(SessionLocal session) {
         Value a = arg.getValue(session).convertTo(type, session);
         return a == ValueNull.INSTANCE ? a : a.negate();
     }
 
     @Override
-    public Expression optimize(Session session) {
+    public Expression optimize(SessionLocal session) {
         arg = arg.optimize(session);
         type = arg.getType();
         if (type.getValueType() == Value.UNKNOWN) {

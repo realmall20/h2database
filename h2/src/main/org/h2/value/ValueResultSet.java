@@ -11,7 +11,7 @@ import java.sql.SQLException;
 import java.util.Arrays;
 
 import org.h2.engine.CastDataProvider;
-import org.h2.engine.SessionInterface;
+import org.h2.engine.Session;
 import org.h2.message.DbException;
 import org.h2.result.ResultInterface;
 import org.h2.result.SimpleResult;
@@ -47,7 +47,7 @@ public final class ValueResultSet extends Value {
      *            meta data)
      * @return the value
      */
-    public static ValueResultSet get(SessionInterface session, ResultSet rs, int maxrows) {
+    public static ValueResultSet get(Session session, ResultSet rs, int maxrows) {
         try {
             ResultSetMetaData meta = rs.getMetaData();
             int columnCount = meta.getColumnCount();
@@ -61,10 +61,11 @@ public final class ValueResultSet extends Value {
                 int scale = meta.getScale(i + 1);
                 TypeInfo typeInfo;
                 if (columnType == Value.ARRAY && columnTypeName.endsWith(" ARRAY")) {
-                    typeInfo = TypeInfo.getTypeInfo(Value.ARRAY, -1L, 0,
-                            new ExtTypeInfoArray(TypeInfo.getTypeInfo(
-                                    DataType.getTypeByName(columnTypeName.substring(0, columnTypeName.length() - 6),
-                                            session.getMode()).type)));
+                    typeInfo = TypeInfo
+                            .getTypeInfo(Value.ARRAY, -1L, 0,
+                                    TypeInfo.getTypeInfo(DataType.getTypeByName(
+                                            columnTypeName.substring(0, columnTypeName.length() - 6),
+                                            session.getMode()).type));
                 } else {
                     typeInfo = TypeInfo.getTypeInfo(columnType, precision, scale, null);
                 }
@@ -73,7 +74,7 @@ public final class ValueResultSet extends Value {
             for (int i = 0; i < maxrows && rs.next(); i++) {
                 Value[] list = new Value[columnCount];
                 for (int j = 0; j < columnCount; j++) {
-                    list[j] = DataType.convertToValue(session, rs.getObject(j + 1),
+                    list[j] = ValueToObjectConverter.objectToValue(session, rs.getObject(j + 1),
                             simple.getColumnType(j).getValueType());
                 }
                 simple.addRow(list);
@@ -159,12 +160,7 @@ public final class ValueResultSet extends Value {
     }
 
     @Override
-    public Object getObject() {
-        return getString();
-    }
-
-    @Override
-    public ResultInterface getResult() {
+    public SimpleResult getResult() {
         return result.createShallowCopy(null);
     }
 

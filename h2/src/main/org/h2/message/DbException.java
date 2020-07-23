@@ -589,7 +589,7 @@ public class DbException extends RuntimeException {
         case HEX_STRING_ODD_1:
         case HEX_STRING_WRONG_1:
         case INVALID_VALUE_2:
-        case SEQUENCE_ATTRIBUTES_INVALID_6:
+        case SEQUENCE_ATTRIBUTES_INVALID_7:
         case INVALID_TO_CHAR_FORMAT:
         case PARAMETER_NOT_SET_1:
         case PARSE_ERROR_1:
@@ -643,24 +643,6 @@ public class DbException extends RuntimeException {
 
     private static String filterSQL(String sql) {
         return sql == null || !sql.contains(HIDE_SQL) ? sql : "-";
-    }
-
-    /**
-     * Convert an exception to an IO exception.
-     *
-     * @param e the root cause
-     * @return the IO exception
-     */
-    public static IOException convertToIOException(Throwable e) {
-        if (e instanceof IOException) {
-            return (IOException) e;
-        }
-        if (e instanceof JdbcException) {
-            if (e.getCause() != null) {
-                e = e.getCause();
-            }
-        }
-        return new IOException(e.toString(), e);
     }
 
     /**

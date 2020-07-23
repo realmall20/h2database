@@ -8,7 +8,7 @@ package org.h2.command.ddl;
 import org.h2.api.ErrorCode;
 import org.h2.command.CommandInterface;
 import org.h2.engine.Right;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.message.DbException;
 import org.h2.schema.Sequence;
 import org.h2.table.Column;
@@ -24,7 +24,7 @@ public class TruncateTable extends DefineCommand {
 
     private boolean restart;
 
-    public TruncateTable(Session session) {
+    public TruncateTable(SessionLocal session) {
         super(session);
     }
 
@@ -49,7 +49,7 @@ public class TruncateTable extends DefineCommand {
             for (Column column : table.getColumns()) {
                 Sequence sequence = column.getSequence();
                 if (sequence != null) {
-                    sequence.modify(null, sequence.getStartValue(), null, null, null);
+                    sequence.modify(sequence.getStartValue(), null, null, null, null, null, null);
                     session.getDatabase().updateMeta(session, sequence);
                 }
             }

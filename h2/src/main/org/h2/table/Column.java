@@ -13,10 +13,9 @@ import org.h2.command.Parser;
 import org.h2.command.ddl.SequenceOptions;
 import org.h2.engine.CastDataProvider;
 import org.h2.engine.Constants;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.expression.ExpressionVisitor;
-import org.h2.expression.SequenceValue;
 import org.h2.expression.ValueExpression;
 import org.h2.message.DbException;
 import org.h2.result.Row;
@@ -24,8 +23,10 @@ import org.h2.schema.Domain;
 import org.h2.schema.Schema;
 import org.h2.schema.Sequence;
 import org.h2.util.HasSQL;
+import org.h2.util.ParserUtil;
 import org.h2.util.StringUtils;
 import org.h2.value.TypeInfo;
+import org.h2.value.Typed;
 import org.h2.value.Value;
 import org.h2.value.ValueBigint;
 import org.h2.value.ValueNull;
@@ -34,7 +35,7 @@ import org.h2.value.ValueUuid;
 /**
  * This class represents a column in a table.
  */
-public class Column implements HasSQL {
+public class Column implements HasSQL, Typed {
 
     /**
      * The name of the rowid pseudo column.
@@ -66,11 +67,10 @@ public class Column implements HasSQL {
     private boolean nullable = true;
     private Expression defaultExpression;
     private Expression onUpdateExpression;
-    private String originalSQL;
-    private SequenceOptions autoIncrementOptions;
+    private SequenceOptions identityOptions;
     private boolean convertNullToDefault;
     private Sequence sequence;
-    private boolean isGenerated;
+    private boolean isGeneratedAlways;
     private GeneratedColumnResolver generatedTableFilter;
     private int selectivity;
     private String comment;
@@ -126,19 +126,16 @@ public class Column implements HasSQL {
         return builder;
     }
 
-    public Column(String name, int valueType) {
-        this(name, TypeInfo.getTypeInfo(valueType));
-    }
-
     public Column(String name, TypeInfo type) {
         this.name = name;
         this.type = type;
     }
 
-    public Column(String name, TypeInfo type, String originalSQL) {
+    public Column(String name, TypeInfo type, Table table, int columnId) {
         this.name = name;
         this.type = type;
-        this.originalSQL = originalSQL;
+        this.table = table;
+        this.columnId = columnId;
     }
 
     @Override
@@ -176,7 +173,7 @@ public class Column implements HasSQL {
     /**
      * Convert a value to this column's type without precision and scale checks.
      *
-     * @provider the cast information provider
+     * @param provider the cast information provider
      * @param v the value
      * @return the value
      */
@@ -192,12 +189,32 @@ public class Column implements HasSQL {
     }
 
     /**
+     * Returns whether this column is an identity column.
+     *
+     * @return whether this column is an identity column
+     */
+    public boolean isIdentity() {
+        return sequence != null || identityOptions != null;
+    }
+
+    /**
      * Returns whether this column is a generated column.
      *
      * @return whether this column is a generated column
      */
-    public boolean getGenerated() {
-        return isGenerated;
+    public boolean isGenerated() {
+        return isGeneratedAlways && defaultExpression != null;
+    }
+
+    /**
+     * Returns whether this column is a generated column or always generated
+     * identity column.
+     *
+     * @return whether this column is a generated column or always generated
+     *         identity column
+     */
+    public boolean isGeneratedAlways() {
+        return isGeneratedAlways;
     }
 
     /**
@@ -207,7 +224,7 @@ public class Column implements HasSQL {
      * @param expression the computed expression
      */
     public void setGeneratedExpression(Expression expression) {
-        this.isGenerated = true;
+        this.isGeneratedAlways = true;
         this.defaultExpression = expression;
     }
 
@@ -232,7 +249,7 @@ public class Column implements HasSQL {
      * @param session the session
      * @param defaultExpression the default expression
      */
-    public void setDefaultExpression(Session session, Expression defaultExpression) {
+    public void setDefaultExpression(SessionLocal session, Expression defaultExpression) {
         // also to test that no column names are used
         if (defaultExpression != null) {
             defaultExpression = defaultExpression.optimize(session);
@@ -242,6 +259,7 @@ public class Column implements HasSQL {
             }
         }
         this.defaultExpression = defaultExpression;
+        this.isGeneratedAlways = false;
     }
 
     /**
@@ -250,7 +268,7 @@ public class Column implements HasSQL {
      * @param session the session
      * @param onUpdateExpression the on update expression
      */
-    public void setOnUpdateExpression(Session session, Expression onUpdateExpression) {
+    public void setOnUpdateExpression(SessionLocal session, Expression onUpdateExpression) {
         // also to test that no column names are used
         if (onUpdateExpression != null) {
             onUpdateExpression = onUpdateExpression.optimize(session);
@@ -272,7 +290,7 @@ public class Column implements HasSQL {
 
     @Override
     public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
-        return rowId ? builder.append(name) : Parser.quoteIdentifier(builder, name, sqlFlags);
+        return rowId ? builder.append(name) : ParserUtil.quoteIdentifier(builder, name, sqlFlags);
     }
 
     /**
@@ -290,6 +308,7 @@ public class Column implements HasSQL {
         return name;
     }
 
+    @Override
     public TypeInfo getType() {
         return type;
     }
@@ -342,40 +361,23 @@ public class Column implements HasSQL {
      * @param row the row
      * @return the new or converted value
      */
-    public Value validateConvertUpdateSequence(Session session, Value value, Row row) {
-        Expression localDefaultExpression = defaultExpression;
-        boolean addKey = false;
+    Value validateConvertUpdateSequence(SessionLocal session, Value value, Row row) {
         if (value == null) {
-            if (localDefaultExpression == null) {
-                if (!nullable) {
-                    throw DbException.get(ErrorCode.NULL_NOT_ALLOWED, name);
-                }
-                value = ValueNull.INSTANCE;
+            if (sequence != null) {
+                value = session.getNextValueFor(sequence, null);
             } else {
-                if (isGenerated) {
-                    synchronized (this) {
-                        generatedTableFilter.set(row);
-                        try {
-                            value = localDefaultExpression.getValue(session);
-                        } finally {
-                            generatedTableFilter.set(null);
-                        }
-                    }
-                } else {
-                    value = localDefaultExpression.getValue(session);
+                value = getDefaultOrGenerated(session, row);
+            }
+        } else if (value == ValueNull.INSTANCE) {
+            if (sequence != null) {
+                value = session.getNextValueFor(sequence, null);
+            } else {
+                if (convertNullToDefault) {
+                    value = getEffectiveDefaultExpression().getValue(session);
                 }
                 if (value == ValueNull.INSTANCE && !nullable) {
                     throw DbException.get(ErrorCode.NULL_NOT_ALLOWED, name);
                 }
-                addKey = true;
-            }
-        } else if (value == ValueNull.INSTANCE) {
-            if (convertNullToDefault) {
-                value = localDefaultExpression.getValue(session);
-                addKey = true;
-            }
-            if (value == ValueNull.INSTANCE && !nullable) {
-                throw DbException.get(ErrorCode.NULL_NOT_ALLOWED, name);
             }
         }
         try {
@@ -389,10 +391,37 @@ public class Column implements HasSQL {
         if (domain != null) {
             domain.checkConstraints(session, value);
         }
-        if (addKey && !localDefaultExpression.isConstant() && primaryKey) {
-            session.setLastIdentity(value);
+        if (sequence != null && session.getMode().updateSequenceOnManualIdentityInsertion) {
+            updateSequenceIfRequired(session, value.getLong());
         }
-        updateSequenceIfRequired(session, value);
+        return value;
+    }
+
+    private Value getDefaultOrGenerated(SessionLocal session, Row row) {
+        Value value;
+        Expression localDefaultExpression = getEffectiveDefaultExpression();
+        if (localDefaultExpression == null) {
+            if (!nullable) {
+                throw DbException.get(ErrorCode.NULL_NOT_ALLOWED, name);
+            }
+            value = ValueNull.INSTANCE;
+        } else {
+            if (isGeneratedAlways) {
+                synchronized (this) {
+                    generatedTableFilter.set(row);
+                    try {
+                        value = localDefaultExpression.getValue(session);
+                    } finally {
+                        generatedTableFilter.set(null);
+                    }
+                }
+            } else {
+                value = localDefaultExpression.getValue(session);
+            }
+            if (value == ValueNull.INSTANCE && !nullable) {
+                throw DbException.get(ErrorCode.NULL_NOT_ALLOWED, name);
+            }
+        }
         return value;
     }
 
@@ -405,28 +434,32 @@ public class Column implements HasSQL {
         return DbException.get(ErrorCode.DATA_CONVERSION_ERROR_1, cause, builder.toString());
     }
 
-    private void updateSequenceIfRequired(Session session, Value value) {
-        if (sequence != null) {
-            long current = sequence.getCurrentValue();
-            long inc = sequence.getIncrement();
-            long now = value.getLong();
-            boolean update = false;
-            if (inc > 0 && now > current) {
-                update = true;
-            } else if (inc < 0 && now < current) {
-                update = true;
-            }
-            if (update) {
-                sequence.modify(null, now + inc, null, null, null);
-                session.setLastIdentity(ValueBigint.get(now));
-                sequence.flush(session);
-            }
+    private void updateSequenceIfRequired(SessionLocal session, long value) {
+        if (sequence.getCycle() == Sequence.Cycle.EXHAUSTED) {
+            return;
         }
+        long current = sequence.getCurrentValue();
+        long inc = sequence.getIncrement();
+        if (inc > 0) {
+            if (value < current) {
+                return;
+            }
+        } else if (value > current) {
+            return;
+        }
+        try {
+            sequence.modify(value + inc, null, null, null, null, null, null);
+        } catch (DbException ex) {
+            if (ex.getErrorCode() == ErrorCode.SEQUENCE_ATTRIBUTES_INVALID_7) {
+                return;
+            }
+            throw ex;
+        }
+        sequence.flush(session);
     }
 
     /**
-     * Convert the auto-increment flag to a sequence that is linked with this
-     * table.
+     * Initialize the sequence for this column.
      *
      * @param session the session
      * @param schema the schema where the sequence should be generated
@@ -434,30 +467,21 @@ public class Column implements HasSQL {
      * @param temporary true if the sequence is temporary and does not need to
      *            be stored
      */
-    public void convertAutoIncrementToSequence(Session session, Schema schema,
-            int id, boolean temporary) {
-        if (autoIncrementOptions == null) {
+    public void initializeSequence(SessionLocal session, Schema schema, int id, boolean temporary) {
+        if (identityOptions == null) {
             DbException.throwInternalError();
-        }
-        if ("IDENTITY".equals(originalSQL)) {
-            originalSQL = "BIGINT";
-        } else if ("SERIAL".equals(originalSQL)) {
-            originalSQL = "INT";
         }
         String sequenceName;
         do {
-            ValueUuid uuid = ValueUuid.getNewRandom();
-            String s = uuid.getString();
-            s = StringUtils.toUpperEnglish(s.replace('-', '_'));
-            sequenceName = "SYSTEM_SEQUENCE_" + s;
+            sequenceName = "SYSTEM_SEQUENCE_"
+                    + StringUtils.toUpperEnglish(ValueUuid.getNewRandom().getString().replace('-', '_'));
         } while (schema.findSequence(sequenceName) != null);
-        Sequence seq = new Sequence(session, schema, id, sequenceName, autoIncrementOptions, true);
+        identityOptions.setDataType(type);
+        Sequence seq = new Sequence(session, schema, id, sequenceName, identityOptions, true);
         seq.setTemporary(temporary);
         session.getDatabase().addSchemaObject(session, seq);
-        setAutoIncrementOptions(null);
-        SequenceValue seqValue = new SequenceValue(seq, null);
-        setDefaultExpression(session, seqValue);
-        setSequence(seq);
+        // This method also ensures NOT NULL
+        setSequence(seq, isGeneratedAlways);
     }
 
     /**
@@ -465,9 +489,9 @@ public class Column implements HasSQL {
      *
      * @param session the session
      */
-    public void prepareExpression(Session session) {
+    public void prepareExpression(SessionLocal session) {
         if (defaultExpression != null) {
-            if (isGenerated) {
+            if (isGeneratedAlways) {
                 generatedTableFilter = new GeneratedColumnResolver(table);
                 defaultExpression.mapColumns(generatedTableFilter, 0, Expression.MAP_INITIAL);
             }
@@ -476,109 +500,131 @@ public class Column implements HasSQL {
         if (onUpdateExpression != null) {
             onUpdateExpression = onUpdateExpression.optimize(session);
         }
+        if (domain != null) {
+            domain.getColumn().prepareExpression(session);
+        }
     }
 
     public String getCreateSQLWithoutName() {
-        return getCreateSQL(false);
+        return getCreateSQL(new StringBuilder(), false);
     }
 
     public String getCreateSQL() {
-        return getCreateSQL(true);
+        return getCreateSQL(false);
     }
 
-    private String getCreateSQL(boolean includeName) {
-        StringBuilder buff = new StringBuilder();
-        if (includeName && name != null) {
-            Parser.quoteIdentifier(buff, name, DEFAULT_SQL_FLAGS).append(' ');
+    public String getCreateSQL(boolean forMeta) {
+        StringBuilder builder = new StringBuilder();
+        if (name != null) {
+            ParserUtil.quoteIdentifier(builder, name, DEFAULT_SQL_FLAGS).append(' ');
         }
-        if (originalSQL != null) {
-            buff.append(originalSQL);
+        return getCreateSQL(builder, forMeta);
+    }
+
+    private String getCreateSQL(StringBuilder builder, boolean forMeta) {
+        if (domain != null) {
+            domain.getSQL(builder, DEFAULT_SQL_FLAGS);
         } else {
-            type.getSQL(buff);
+            type.getSQL(builder, DEFAULT_SQL_FLAGS);
         }
 
         if (!visible) {
-            buff.append(" INVISIBLE ");
+            builder.append(" INVISIBLE ");
         }
 
-        if (defaultExpression != null) {
-            if (isGenerated) {
-                buff.append(" GENERATED ALWAYS AS ");
-                defaultExpression.getEnclosedSQL(buff, DEFAULT_SQL_FLAGS);
+        if (sequence != null) {
+            builder.append(" GENERATED ");
+            builder.append(isGeneratedAlways ? "ALWAYS" : "BY DEFAULT");
+            builder.append(" AS IDENTITY");
+            if (!forMeta) {
+                sequence.getSequenceOptionsSQL(builder.append('(')).append(')');
+            }
+        } else if (defaultExpression != null) {
+            if (isGeneratedAlways) {
+                builder.append(" GENERATED ALWAYS AS ");
+                defaultExpression.getEnclosedSQL(builder, DEFAULT_SQL_FLAGS);
             } else {
-                buff.append(" DEFAULT ");
-                defaultExpression.getSQL(buff, DEFAULT_SQL_FLAGS);
+                builder.append(" DEFAULT ");
+                defaultExpression.getUnenclosedSQL(builder, DEFAULT_SQL_FLAGS);
             }
         }
         if (onUpdateExpression != null) {
-            buff.append(" ON UPDATE ");
-            onUpdateExpression.getSQL(buff, DEFAULT_SQL_FLAGS);
+            builder.append(" ON UPDATE ");
+            onUpdateExpression.getUnenclosedSQL(builder, DEFAULT_SQL_FLAGS);
         }
         if (convertNullToDefault) {
-            buff.append(" NULL_TO_DEFAULT");
+            builder.append(" NULL_TO_DEFAULT");
         }
-        if (sequence != null) {
-            buff.append(" SEQUENCE ");
-            sequence.getSQL(buff, DEFAULT_SQL_FLAGS);
+        if (forMeta && sequence != null) {
+            builder.append(" SEQUENCE ");
+            sequence.getSQL(builder, DEFAULT_SQL_FLAGS);
         }
         if (selectivity != 0) {
-            buff.append(" SELECTIVITY ").append(selectivity);
+            builder.append(" SELECTIVITY ").append(selectivity);
         }
         if (comment != null) {
-            buff.append(" COMMENT ");
-            StringUtils.quoteStringSQL(buff, comment);
+            builder.append(" COMMENT ");
+            StringUtils.quoteStringSQL(builder, comment);
         }
         if (!nullable) {
-            buff.append(" NOT NULL");
+            builder.append(" NOT NULL");
         }
-        return buff.toString();
+        return builder.toString();
     }
 
     public boolean isNullable() {
         return nullable;
     }
 
-    public void setOriginalSQL(String original) {
-        originalSQL = original;
-    }
-
-    public String getOriginalSQL() {
-        return originalSQL;
-    }
-
     public Expression getDefaultExpression() {
         return defaultExpression;
+    }
+
+    public Expression getEffectiveDefaultExpression() {
+        return defaultExpression != null ? defaultExpression
+                : domain != null ? domain.getColumn().getEffectiveDefaultExpression() : null;
     }
 
     public Expression getOnUpdateExpression() {
         return onUpdateExpression;
     }
 
-    public boolean isAutoIncrement() {
-        return autoIncrementOptions != null;
+    public Expression getEffectiveOnUpdateExpression() {
+        return onUpdateExpression != null ? onUpdateExpression
+                : domain != null ? domain.getColumn().getEffectiveOnUpdateExpression() : null;
+    }
+
+    public boolean hasIdentityOptions() {
+        return identityOptions != null;
     }
 
     /**
-     * Set the autoincrement flag and related options of this column.
+     * Set the identity options of this column.
      *
-     * @param sequenceOptions
-     *            sequence options, or {@code null} to reset the flag
+     * @param identityOptions
+     *            identity column options
+     * @param generatedAlways
+     *            whether value should be always generated
      */
-    public void setAutoIncrementOptions(SequenceOptions sequenceOptions) {
-        this.autoIncrementOptions = sequenceOptions;
-        this.nullable = false;
-        if (sequenceOptions != null) {
-            convertNullToDefault = true;
-        }
+    public void setIdentityOptions(SequenceOptions identityOptions, boolean generatedAlways) {
+        this.identityOptions = identityOptions;
+        this.isGeneratedAlways = generatedAlways;
+        removeNonIdentityProperties();
+    }
+
+    private void removeNonIdentityProperties() {
+        convertNullToDefault = nullable = false;
+        onUpdateExpression = defaultExpression = null;
     }
 
     /**
-     * Returns autoincrement options, or {@code null}.
+     * Returns identity column options, or {@code null} if sequence was already
+     * created or this column is not an identity column.
      *
-     * @return autoincrement options, or {@code null}
+     * @return identity column options, or {@code null}
      */
-    public SequenceOptions getAutoIncrementOptions() {
-        return autoIncrementOptions;
+    public SequenceOptions getIdentityOptions() {
+        return identityOptions;
     }
 
     public void setConvertNullToDefault(boolean convert) {
@@ -595,8 +641,13 @@ public class Column implements HasSQL {
         this.name = newName;
     }
 
-    public void setSequence(Sequence sequence) {
+    public void setSequence(Sequence sequence, boolean generatedAlways) {
         this.sequence = sequence;
+        this.isGeneratedAlways = generatedAlways;
+        this.identityOptions = null;
+        if (sequence != null) {
+            removeNonIdentityProperties();
+        }
     }
 
     public Sequence getSequence() {
@@ -623,16 +674,18 @@ public class Column implements HasSQL {
         this.selectivity = selectivity;
     }
 
-    String getDefaultSQL() {
-        return defaultExpression == null ? null : defaultExpression.getSQL(DEFAULT_SQL_FLAGS);
+    public String getDefaultSQL() {
+        return defaultExpression == null ? null
+                : defaultExpression.getUnenclosedSQL(new StringBuilder(), DEFAULT_SQL_FLAGS).toString();
     }
 
     String getOnUpdateSQL() {
-        return onUpdateExpression == null ? null : onUpdateExpression.getSQL(DEFAULT_SQL_FLAGS);
+        return onUpdateExpression == null ? null
+                : onUpdateExpression.getUnenclosedSQL(new StringBuilder(), DEFAULT_SQL_FLAGS).toString();
     }
 
     public void setComment(String comment) {
-        this.comment = comment;
+        this.comment = comment != null && !comment.isEmpty() ? comment : null;
     }
 
     public String getComment() {
@@ -657,10 +710,12 @@ public class Column implements HasSQL {
                 visitor.getDependencies().add(sequence);
             }
         }
-        if (defaultExpression != null && !defaultExpression.isEverything(visitor)) {
+        Expression e = getEffectiveDefaultExpression();
+        if (e != null && !e.isEverything(visitor)) {
             return false;
         }
-        if (onUpdateExpression != null && !onUpdateExpression.isEverything(visitor)) {
+        e = getEffectiveOnUpdateExpression();
+        if (e != null && !e.isEverything(visitor)) {
             return false;
         }
         return true;
@@ -709,7 +764,7 @@ public class Column implements HasSQL {
         if (primaryKey != newColumn.primaryKey) {
             return false;
         }
-        if (autoIncrementOptions != null || newColumn.autoIncrementOptions != null) {
+        if (identityOptions != null || newColumn.identityOptions != null) {
             return false;
         }
         if (domain != newColumn.domain) {
@@ -721,7 +776,7 @@ public class Column implements HasSQL {
         if (defaultExpression != null || newColumn.defaultExpression != null) {
             return false;
         }
-        if (isGenerated || newColumn.isGenerated) {
+        if (isGeneratedAlways || newColumn.isGeneratedAlways) {
             return false;
         }
         if (onUpdateExpression != null || newColumn.onUpdateExpression != null) {
@@ -738,18 +793,18 @@ public class Column implements HasSQL {
     public void copy(Column source) {
         name = source.name;
         type = source.type;
+        domain = source.domain;
         // table is not set
         // columnId is not set
         nullable = source.nullable;
         defaultExpression = source.defaultExpression;
         onUpdateExpression = source.onUpdateExpression;
-        originalSQL = source.originalSQL;
-        // autoIncrement, start, increment is not set
+        // identityOptions field is not set
         convertNullToDefault = source.convertNullToDefault;
         sequence = source.sequence;
         comment = source.comment;
         generatedTableFilter = source.generatedTableFilter;
-        isGenerated = source.isGenerated;
+        isGeneratedAlways = source.isGeneratedAlways;
         selectivity = source.selectivity;
         primaryKey = source.primaryKey;
         visible = source.visible;

@@ -12,7 +12,7 @@ import org.h2.api.DatabaseEventListener;
 import org.h2.api.ErrorCode;
 import org.h2.engine.Database;
 import org.h2.engine.DbObject;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.expression.Parameter;
 import org.h2.message.DbException;
@@ -30,7 +30,7 @@ public abstract class Prepared {
     /**
      * The session.
      */
-    protected Session session;
+    protected SessionLocal session;
 
     /**
      * The SQL string.
@@ -75,7 +75,7 @@ public abstract class Prepared {
      *
      * @param session the session
      */
-    public Prepared(Session session) {
+    public Prepared(SessionLocal session) {
         this.session = session;
         modificationMetaId = session.getDatabase().getModificationMetaId();
     }
@@ -317,7 +317,7 @@ public abstract class Prepared {
      *
      * @param currentSession the new session
      */
-    public void setSession(Session currentSession) {
+    public void setSession(SessionLocal currentSession) {
         this.session = currentSession;
     }
 
@@ -332,15 +332,13 @@ public abstract class Prepared {
         if (session.getTrace().isInfoEnabled() && startTimeNanos > 0) {
             long deltaTimeNanos = System.nanoTime() - startTimeNanos;
             String params = Trace.formatParams(parameters);
-            session.getTrace().infoSQL(sqlStatement, params, rowCount,
-                    deltaTimeNanos / 1000 / 1000);
+            session.getTrace().infoSQL(sqlStatement, params, rowCount, deltaTimeNanos / 1_000_000L);
         }
         // startTime_nanos can be zero for the command that actually turns on
         // statistics
         if (session.getDatabase().getQueryStatistics() && startTimeNanos != 0) {
             long deltaTimeNanos = System.nanoTime() - startTimeNanos;
-            session.getDatabase().getQueryStatisticsData().
-                    update(toString(), deltaTimeNanos, rowCount);
+            session.getDatabase().getQueryStatisticsData().update(toString(), deltaTimeNanos, rowCount);
         }
     }
 
@@ -405,10 +403,8 @@ public abstract class Prepared {
      * @param list the expression list
      * @return the SQL snippet
      */
-    protected static String getSimpleSQL(Expression[] list) {
-        StringBuilder builder = new StringBuilder();
-        Expression.writeExpressions(builder, list, HasSQL.TRACE_SQL_FLAGS);
-        return builder.toString();
+    public static String getSimpleSQL(Expression[] list) {
+        return Expression.writeExpressions(new StringBuilder(), list, HasSQL.TRACE_SQL_FLAGS).toString();
     }
 
     /**
@@ -452,7 +448,7 @@ public abstract class Prepared {
         this.cteCleanups = cteCleanups;
     }
 
-    public Session getSession() {
+    public SessionLocal getSession() {
         return session;
     }
 

@@ -22,13 +22,14 @@ import org.h2.engine.ConnectionInfo;
 import org.h2.engine.Constants;
 import org.h2.engine.Engine;
 import org.h2.engine.GeneratedKeysMode;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.engine.SessionRemote;
 import org.h2.engine.SysProperties;
 import org.h2.expression.Parameter;
 import org.h2.expression.ParameterInterface;
 import org.h2.expression.ParameterRemote;
 import org.h2.jdbc.JdbcException;
+import org.h2.jdbc.meta.DatabaseMetaServer;
 import org.h2.message.DbException;
 import org.h2.result.ResultColumn;
 import org.h2.result.ResultInterface;
@@ -49,7 +50,7 @@ public class TcpServerThread implements Runnable {
 
     protected final Transfer transfer;
     private final TcpServer server;
-    private Session session;
+    private SessionLocal session;
     private boolean stop;
     private Thread thread;
     private Command commit;
@@ -162,7 +163,13 @@ public class TcpServerThread implements Runnable {
                                 .append(':').append(socket.getLocalPort()).toString(), //
                         socket.getInetAddress().getAddress(), socket.getPort(),
                         new StringBuilder().append('P').append(clientVersion).toString()));
-                session = Engine.getInstance().createSession(ci);
+                if (clientVersion < Constants.TCP_PROTOCOL_VERSION_20) {
+                    // For DatabaseMetaData
+                    ci.setProperty("OLD_INFORMATION_SCHEMA", "TRUE");
+                    // For H2 Console
+                    ci.setProperty("NON_KEYWORDS", "VALUE");
+                }
+                session = Engine.createSession(ci);
                 transfer.setSession(session);
                 server.addConnection(threadId, originalURL, ci.getUserName());
                 trace("Connected");
@@ -514,6 +521,32 @@ public class TcpServerThread implements Runnable {
             transfer.writeInt(SessionRemote.STATUS_OK);
             transfer.writeInt(length);
             transfer.writeBytes(buff, 0, length);
+            transfer.flush();
+            break;
+        }
+        case SessionRemote.GET_JDBC_META: {
+            int code = transfer.readInt();
+            int length = transfer.readInt();
+            Value[] args = new Value[length];
+            for (int i = 0; i < length; i++) {
+                args[i] = transfer.readValue();
+            }
+            int old = session.getModificationId();
+            ResultInterface result;
+            synchronized (session) {
+                result = DatabaseMetaServer.process(session, code, args);
+            }
+            int columnCount = result.getVisibleColumnCount();
+            int state = getState(old);
+            transfer.writeInt(state).writeInt(columnCount);
+            int rowCount = result.getRowCount();
+            transfer.writeInt(rowCount);
+            for (int i = 0; i < columnCount; i++) {
+                ResultColumn.writeColumn(transfer, result, i);
+            }
+            for (int i = 0; i < rowCount; i++) {
+                sendRow(result);
+            }
             transfer.flush();
             break;
         }

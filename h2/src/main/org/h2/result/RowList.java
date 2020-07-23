@@ -8,7 +8,7 @@ package org.h2.result;
 import java.util.ArrayList;
 import org.h2.engine.Constants;
 import org.h2.engine.Database;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.store.Data;
 import org.h2.store.FileStore;
 import org.h2.table.Table;
@@ -23,7 +23,7 @@ import org.h2.value.ValueLobFile;
  */
 public class RowList implements AutoCloseable {
 
-    private final Session session;
+    private final SessionLocal session;
     private final Table table;
     private final ArrayList<Row> list = Utils.newSmallArrayList();
     private int size;
@@ -39,8 +39,9 @@ public class RowList implements AutoCloseable {
      * Construct a new row list for this session.
      *
      * @param session the session
+     * @param table the table
      */
-    public RowList(Session session, Table table) {
+    public RowList(SessionLocal session, Table table) {
         this.session = session;
         this.table = table;
         if (session.getDatabase().isPersistent()) {

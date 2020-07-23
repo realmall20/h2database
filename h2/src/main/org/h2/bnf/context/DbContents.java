@@ -11,7 +11,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 
-import org.h2.engine.SessionInterface;
+import org.h2.engine.Session;
 import org.h2.jdbc.JdbcConnection;
 import org.h2.util.ParserUtil;
 import org.h2.util.StringUtils;
@@ -36,6 +36,8 @@ public class DbContents {
     private boolean isDB2;
 
     private boolean databaseToUpper, databaseToLower;
+
+    private boolean mayHaveStandardViews = true;
 
     /**
      * @return The default schema.
@@ -115,6 +117,22 @@ public class DbContents {
     }
 
     /**
+     * @return whether standard INFORMATION_SCHEMA.VIEWS may be supported
+     */
+    public boolean mayHaveStandardViews() {
+        return mayHaveStandardViews;
+    }
+
+    /**
+     * @param mayHaveStandardViews
+     *            whether standard INFORMATION_SCHEMA.VIEWS is detected as
+     *            supported
+     */
+    public void setMayHaveStandardViews(boolean mayHaveStandardViews) {
+        this.mayHaveStandardViews = mayHaveStandardViews;
+    }
+
+    /**
      * Read the contents of this database from the database meta data.
      *
      * @param url the database URL
@@ -134,7 +152,7 @@ public class DbContents {
         isFirebird = url.startsWith("jdbc:firebirdsql:");
         isMSSQLServer = url.startsWith("jdbc:sqlserver:");
         if (isH2) {
-            SessionInterface.StaticSettings settings = ((JdbcConnection) conn).getStaticSettings();
+            Session.StaticSettings settings = ((JdbcConnection) conn).getStaticSettings();
             databaseToUpper = settings.databaseToUpper;
             databaseToLower = settings.databaseToLower;
         }else if (isMySQL || isPostgreSQL) {
@@ -233,7 +251,9 @@ public class DbContents {
     private String getDefaultSchemaName(DatabaseMetaData meta) {
         String defaultSchemaName = "";
         try {
-            if (isOracle) {
+            if (isH2) {
+                return meta.storesLowerCaseIdentifiers() ? "public" : "PUBLIC";
+            } else if (isOracle) {
                 return meta.getUserName();
             } else if (isPostgreSQL) {
                 return "public";
@@ -244,15 +264,8 @@ public class DbContents {
             } else if (isFirebird) {
                 return null;
             }
-            ResultSet rs = meta.getSchemas();
-            int index = rs.findColumn("IS_DEFAULT");
-            while (rs.next()) {
-                if (rs.getBoolean(index)) {
-                    defaultSchemaName = rs.getString("TABLE_SCHEM");
-                }
-            }
         } catch (SQLException e) {
-            // IS_DEFAULT not found
+            // Ignore
         }
         return defaultSchemaName;
     }

@@ -56,6 +56,8 @@ public class CompareMode implements Comparator<Value> {
      */
     public static final String UNSIGNED = "UNSIGNED";
 
+    private static Locale[] LOCALES;
+
     private static volatile CompareMode lastUsed;
 
     private static final boolean CAN_USE_ICU4J;
@@ -154,6 +156,22 @@ public class CompareMode implements Comparator<Value> {
     }
 
     /**
+     * Returns available locales for collations.
+     *
+     * @param onlyIfInitialized
+     *            if {@code true}, returns {@code null} when locales are not yet
+     *            initialized
+     * @return available locales for collations.
+     */
+    public static Locale[] getCollationLocales(boolean onlyIfInitialized) {
+        Locale[] locales = LOCALES;
+        if (locales == null && !onlyIfInitialized) {
+            LOCALES = locales = Collator.getAvailableLocales();
+        }
+        return locales;
+    }
+
+    /**
      * Compare two characters in a string.
      *
      * @param a the first string
@@ -163,15 +181,19 @@ public class CompareMode implements Comparator<Value> {
      * @param ignoreCase true if a case-insensitive comparison should be made
      * @return true if the characters are equals
      */
-    public boolean equalsChars(String a, int ai, String b, int bi,
-            boolean ignoreCase) {
+    public boolean equalsChars(String a, int ai, String b, int bi, boolean ignoreCase) {
         char ca = a.charAt(ai);
         char cb = b.charAt(bi);
-        if (ignoreCase) {
-            ca = Character.toUpperCase(ca);
-            cb = Character.toUpperCase(cb);
+        if (ca == cb) {
+            return true;
         }
-        return ca == cb;
+        if (ignoreCase) {
+            if (Character.toUpperCase(ca) == Character.toUpperCase(cb)
+                    || Character.toLowerCase(ca) == Character.toLowerCase(cb)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**
@@ -213,7 +235,7 @@ public class CompareMode implements Comparator<Value> {
      * @return true if they match
      */
     static boolean compareLocaleNames(Locale locale, String name) {
-        return name.equalsIgnoreCase(locale.toString()) ||
+        return name.equalsIgnoreCase(locale.toString()) || name.equalsIgnoreCase(locale.toLanguageTag()) ||
                 name.equalsIgnoreCase(getName(locale));
     }
 
@@ -250,9 +272,14 @@ public class CompareMode implements Comparator<Value> {
                     result = Collator.getInstance(locale);
                 }
             }
+        } else if (name.indexOf('-') > 0) {
+            Locale locale = Locale.forLanguageTag(name);
+            if (!locale.getLanguage().isEmpty()) {
+                return Collator.getInstance(locale);
+            }
         }
         if (result == null) {
-            for (Locale locale : Collator.getAvailableLocales()) {
+            for (Locale locale : getCollationLocales(false)) {
                 if (compareLocaleNames(locale, name)) {
                     result = Collator.getInstance(locale);
                     break;

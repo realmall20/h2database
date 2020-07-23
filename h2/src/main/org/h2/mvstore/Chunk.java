@@ -5,12 +5,13 @@
  */
 package org.h2.mvstore;
 
-import org.h2.util.StringUtils;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.util.BitSet;
 import java.util.Comparator;
 import java.util.Map;
+
+import org.h2.util.StringUtils;
 
 /**
  * A chunk of data, containing one or multiple pages.
@@ -22,8 +23,8 @@ import java.util.Map;
  * 一块数据，包含一个或者多个的 page
  *
  */
-public final class Chunk
-{
+public final class Chunk {
+
     /**
      * The maximum chunk id.
      */

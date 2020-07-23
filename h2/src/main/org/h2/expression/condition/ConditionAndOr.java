@@ -5,7 +5,7 @@
  */
 package org.h2.expression.condition;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.expression.ExpressionVisitor;
 import org.h2.expression.TypedValueExpression;
@@ -54,9 +54,13 @@ public class ConditionAndOr extends Condition {
     }
 
     @Override
-    public StringBuilder getSQL(StringBuilder builder, int sqlFlags) {
-        builder.append('(');
-        left.getSQL(builder, sqlFlags);
+    public boolean needParentheses() {
+        return true;
+    }
+
+    @Override
+    public StringBuilder getUnenclosedSQL(StringBuilder builder, int sqlFlags) {
+        left.getSQL(builder, sqlFlags, AUTO_PARENTHESES);
         switch (andOrType) {
         case AND:
             builder.append("\n    AND ");
@@ -67,11 +71,11 @@ public class ConditionAndOr extends Condition {
         default:
             throw DbException.throwInternalError("andOrType=" + andOrType);
         }
-        return right.getSQL(builder, sqlFlags).append(')');
+        return right.getSQL(builder, sqlFlags, AUTO_PARENTHESES);
     }
 
     @Override
-    public void createIndexConditions(Session session, TableFilter filter) {
+    public void createIndexConditions(SessionLocal session, TableFilter filter) {
         if (andOrType == AND) {
             left.createIndexConditions(session, filter);
             right.createIndexConditions(session, filter);
@@ -82,7 +86,7 @@ public class ConditionAndOr extends Condition {
     }
 
     @Override
-    public Expression getNotIfPossible(Session session) {
+    public Expression getNotIfPossible(SessionLocal session) {
         // (NOT (A OR B)): (NOT(A) AND NOT(B))
         // (NOT (A AND B)): (NOT(A) OR NOT(B))
         Expression l = left.getNotIfPossible(session);
@@ -98,7 +102,7 @@ public class ConditionAndOr extends Condition {
     }
 
     @Override
-    public Value getValue(Session session) {
+    public Value getValue(SessionLocal session) {
         Value l = left.getValue(session);
         Value r;
         switch (andOrType) {
@@ -134,7 +138,7 @@ public class ConditionAndOr extends Condition {
     }
 
     @Override
-    public Expression optimize(Session session) {
+    public Expression optimize(SessionLocal session) {
         // NULL handling: see wikipedia,
         // http://www-cs-students.stanford.edu/~wlam/compsci/sqlnulls
         left = left.optimize(session);
@@ -200,7 +204,7 @@ public class ConditionAndOr extends Condition {
         return e;
     }
 
-    private static Expression optimizeN(Session session, ConditionAndOr condition) {
+    private static Expression optimizeN(SessionLocal session, ConditionAndOr condition) {
         if (condition.right instanceof ConditionAndOr) {
             ConditionAndOr rightCondition = (ConditionAndOr) condition.right;
             if (rightCondition.andOrType == condition.andOrType) {
@@ -227,7 +231,7 @@ public class ConditionAndOr extends Condition {
      * @param right the right part of the condition
      * @return the optimized condition, or {@code null} if condition cannot be optimized
      */
-    static Expression optimizeIfConstant(Session session, int andOrType, Expression left, Expression right) {
+    static Expression optimizeIfConstant(SessionLocal session, int andOrType, Expression left, Expression right) {
         if (!left.isConstant()) {
             if (!right.isConstant()) {
                 return null;
@@ -264,7 +268,7 @@ public class ConditionAndOr extends Condition {
         }
     }
 
-    private static Expression optimizeConstant(Session session, int andOrType, Value l, Expression right) {
+    private static Expression optimizeConstant(SessionLocal session, int andOrType, Value l, Expression right) {
         switch (andOrType) {
         case AND:
             if (l != ValueNull.INSTANCE && !l.getBoolean()) {
@@ -309,7 +313,7 @@ public class ConditionAndOr extends Condition {
     }
 
     @Override
-    public void updateAggregate(Session session, int stage) {
+    public void updateAggregate(SessionLocal session, int stage) {
         left.updateAggregate(session, stage);
         right.updateAggregate(session, stage);
     }

@@ -5,7 +5,7 @@
  */
 package org.h2.expression.function;
 
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.expression.Expression;
 import org.h2.util.HasSQL;
 import org.h2.value.ValueResultSet;
@@ -14,13 +14,14 @@ import org.h2.value.ValueResultSet;
  * This interface is used by the built-in functions,
  * as well as the user-defined functions.
  */
-public interface FunctionCall extends HasSQL {
+public interface FunctionCall extends HasSQL, NamedExpression {
 
     /**
      * Get the name of the function.
      *
      * @return the name
      */
+    @Override
     String getName();
 
     /**
@@ -30,7 +31,7 @@ public interface FunctionCall extends HasSQL {
      * @param nullArgs the argument list (some arguments may be null)
      * @return the empty result set
      */
-    ValueResultSet getValueForColumnList(Session session, Expression[] nullArgs);
+    ValueResultSet getValueForColumnList(SessionLocal session, Expression[] nullArgs);
 
     /**
      * Get the data type.
@@ -45,7 +46,7 @@ public interface FunctionCall extends HasSQL {
      * @param session the session
      * @return the optimized expression
      */
-    Expression optimize(Session session);
+    Expression optimize(SessionLocal session);
 
     /**
      * Get the function arguments.

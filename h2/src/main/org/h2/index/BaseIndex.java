@@ -10,7 +10,7 @@ import org.h2.api.ErrorCode;
 import org.h2.command.query.AllColumnsForPlan;
 import org.h2.engine.Constants;
 import org.h2.engine.DbObject;
-import org.h2.engine.Session;
+import org.h2.engine.SessionLocal;
 import org.h2.message.DbException;
 import org.h2.message.Trace;
 import org.h2.result.RowFactory;
@@ -127,7 +127,7 @@ public abstract class BaseIndex extends SchemaObjectBase implements Index {
     }
 
     @Override
-    public void removeChildrenAndResources(Session session) {
+    public void removeChildrenAndResources(SessionLocal session) {
         table.removeIndex(this);
         remove(session);
         database.removeMeta(session, getId());
@@ -213,7 +213,7 @@ public abstract class BaseIndex extends SchemaObjectBase implements Index {
         if (sortOrder != null && !isScanIndex) {
             boolean sortOrderMatches = true;
             int coveringCount = 0;
-            int[] sortTypes = sortOrder.getSortTypes();
+            int[] sortTypes = sortOrder.getSortTypesWithNullOrdering();
             TableFilter tableFilter = filters == null ? null : filters[filter];
             for (int i = 0, len = sortTypes.length; i < len; i++) {
                 if (i >= indexColumns.length) {
@@ -254,8 +254,7 @@ public abstract class BaseIndex extends SchemaObjectBase implements Index {
         if (!isScanIndex && allColumnsSet != null) {
             boolean foundAllColumnsWeNeed = true;
             ArrayList<Column> foundCols = allColumnsSet.get(getTable());
-            if (foundCols != null)
-            {
+            if (foundCols != null) {
                 for (Column c : foundCols) {
                     boolean found = false;
                     for (Column c2 : columns) {
@@ -364,9 +363,8 @@ public abstract class BaseIndex extends SchemaObjectBase implements Index {
             return 0;
         }
         boolean aNull = a == ValueNull.INSTANCE;
-        boolean bNull = b == ValueNull.INSTANCE;
-        if (aNull || bNull) {
-            return SortOrder.compareNull(aNull, sortType);
+        if (aNull || b == ValueNull.INSTANCE) {
+            return table.getDatabase().getDefaultNullOrdering().compareNull(aNull, sortType);
         }
         int comp = table.compareValues(database, a, b);
         if ((sortType & SortOrder.DESCENDING) != 0) {

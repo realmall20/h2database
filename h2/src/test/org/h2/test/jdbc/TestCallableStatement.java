@@ -68,18 +68,16 @@ public class TestCallableStatement extends TestDb {
     }
 
     private void testOutParameter(Connection conn) throws SQLException {
-        conn.createStatement().execute(
-                "create table test(id identity) as select null");
+        conn.createStatement().execute("CREATE SEQUENCE SEQ");
         for (int i = 1; i < 20; i++) {
-            CallableStatement cs = conn.prepareCall("{ ? = call IDENTITY()}");
+            CallableStatement cs = conn.prepareCall("{ ? = CALL NEXT VALUE FOR SEQ}");
             cs.registerOutParameter(1, Types.BIGINT);
             cs.execute();
             long id = cs.getLong(1);
-            assertEquals(1, id);
+            assertEquals(i, id);
             cs.close();
         }
-        conn.createStatement().execute(
-                "drop table test");
+        conn.createStatement().execute("DROP SEQUENCE SEQ");
     }
 
     private void testUnsupportedOperations(Connection conn) throws SQLException {
@@ -440,18 +438,17 @@ public class TestCallableStatement extends TestDb {
     }
 
     private void testArrayReturnValue(Connection connection) throws SQLException {
-        Object[][] arraysToTest = new Object[][] {
-            new Object[] {0, 1, 2},
-            new Object[] {0, "1", 2},
-            new Object[] {0, null, 2},
-            new Object[] {0, new Object[] {"2", 1}, new Object[] {null, 1L}},
+        Integer[][] arraysToTest = new Integer[][] {
+            {0, 1, 2},
+            {0, 1, 2},
+            {0, null, 2},
         };
         try (Statement statement = connection.createStatement()) {
             statement.execute("CREATE ALIAS arrayIdentiy FOR \"" +
                             getClass().getName() + ".arrayIdentiy\"");
 
-            for (Object[] arrayToTest : arraysToTest) {
-                Array sqlInputArray = connection.createArrayOf("ignored", arrayToTest);
+            for (Integer[] arrayToTest : arraysToTest) {
+                Array sqlInputArray = connection.createArrayOf("INTEGER", arrayToTest);
                 try {
                     try (CallableStatement callableStatement = connection
                             .prepareCall("{call arrayIdentiy(?)}")) {
@@ -507,7 +504,7 @@ public class TestCallableStatement extends TestDb {
      * @param array the array
      * @return the length of the array
      */
-    public static int getArrayLength(Object[] array) {
+    public static int getArrayLength(Integer[] array) {
         return array == null ? 0 : array.length;
     }
 
@@ -517,7 +514,7 @@ public class TestCallableStatement extends TestDb {
      * @param array the array
      * @return the array
      */
-    public static Object[] arrayIdentiy(Object[] array) {
+    public static Integer[] arrayIdentiy(Integer[] array) {
         return array;
     }
 
