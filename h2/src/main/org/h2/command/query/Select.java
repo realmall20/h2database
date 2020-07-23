@@ -766,7 +766,7 @@ public class Select extends Query {
         boolean lazy = session.isLazyQueryExecution() &&
                 target == null && !isForUpdate && !isQuickAggregateQuery &&
                 fetch != 0 && !fetchPercent && !withTies && offset == 0 && isReadOnly();
-        //字段数据，包括order by 后面的字段
+        // 查询的字段数
         int columnCount = expressions.size();
         //构建一个对象 clomns 代表需要查询的列是哪几个列
         LocalResult result = null;

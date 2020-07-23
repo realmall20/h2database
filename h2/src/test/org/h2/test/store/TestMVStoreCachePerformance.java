@@ -16,6 +16,7 @@ import org.h2.util.Task;
 
 /**
  * Tests the MVStore cache.
+ * 多线程测试 mvStore
  */
 public class TestMVStoreCachePerformance extends TestBase {
 
