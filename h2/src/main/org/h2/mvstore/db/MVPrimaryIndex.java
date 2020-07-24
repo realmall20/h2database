@@ -395,6 +395,7 @@ public class MVPrimaryIndex extends BaseIndex implements MVIndex<Long,SearchRow>
             ensureRowKey(row, first);
             return new SingleRowCursor(row);
         }
+        //封装成索引
         return new MVStoreCursor(map.entryIterator(first, last));
     }
 

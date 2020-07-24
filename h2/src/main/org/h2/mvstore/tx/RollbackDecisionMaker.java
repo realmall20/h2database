@@ -32,11 +32,13 @@ final class RollbackDecisionMaker extends MVMap.DecisionMaker<Record<?,?>> {
     @Override
     public MVMap.Decision decide(Record existingValue, Record providedValue) {
         assert decision == null;
+        //如果记录为空，不操作数据
         if (existingValue == null) {
             // normally existingValue will always be there except of db initialization
             // where some undo log entry was captured on disk but actual map entry was not
             decision = MVMap.Decision.ABORT;
         } else {
+            //老的数据
             VersionedValue<Object> valueToRestore = existingValue.oldValue;
             long operationId;
             if (valueToRestore == null ||
@@ -49,9 +51,11 @@ final class RollbackDecisionMaker extends MVMap.DecisionMaker<Record<?,?>> {
                     Object key = existingValue.key;
                     VersionedValue<Object> previousValue = map.operate(key, valueToRestore,
                             MVMap.DecisionMaker.DEFAULT);
+                    //添加的数据操作的回滚
                     listener.onRollback(map, key, previousValue, valueToRestore);
                 }
             }
+            //对操作日志进行remove
             decision = MVMap.Decision.REMOVE;
         }
         return decision;

@@ -14,6 +14,7 @@ import org.h2.value.VersionedValue;
 
 /**
  * An index that stores the data in an MVStore.
+ *
  */
 public interface MVIndex<K,V> extends Index {
 

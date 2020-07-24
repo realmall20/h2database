@@ -696,10 +696,12 @@ public class TransactionStore {
      */
     void rollbackTo(Transaction t, long maxLogId, long toLogId) {
         int transactionId = t.getId();
-        //没有提交记录
+        //事务操作日志
         MVMap<Long,Record<?,?>> undoLog = undoLogs[transactionId];
         RollbackDecisionMaker decisionMaker = new RollbackDecisionMaker(this, transactionId, toLogId, t.listener);
+        //数据回滚
         for (long logId = maxLogId - 1; logId >= toLogId; logId--) {
+            //获取操作号
             Long undoKey = getOperationId(transactionId, logId);
             undoLog.operate(undoKey, null, decisionMaker);
             decisionMaker.reset();

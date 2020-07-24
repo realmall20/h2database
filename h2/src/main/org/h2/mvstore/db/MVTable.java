@@ -515,6 +515,7 @@ public class MVTable extends RegularTable {
             }
         } catch (Throwable e) {
             try {
+                // 返回到保存点
                 t.rollbackToSavepoint(savepoint);
             } catch (Throwable nested) {
                 e.addSuppressed(nested);

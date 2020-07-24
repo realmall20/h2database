@@ -1905,6 +1905,13 @@ public class SessionLocal extends Session implements TransactionStore.RollbackLi
         return transaction == null ? 0 : transaction.getBlockerId();
     }
 
+    /**
+     * 继承roll back
+     * @param map modified
+     * @param key of the modified entry
+     * @param existingValue value in the map (null if delete is rolled back)
+     * @param restoredValue value to be restored (null if add is rolled back)
+     */
     @Override
     public void onRollback(MVMap<Object, VersionedValue<Object>> map, Object key,
                             VersionedValue<Object> existingValue,

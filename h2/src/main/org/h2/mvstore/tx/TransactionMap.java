@@ -760,6 +760,15 @@ public final class TransactionMap<K, V> extends AbstractMap<K,V> {
         return chooseIterator(from, to, false, true);
     }
 
+    /**
+     * 根据隔离级别获取迭代器
+     * @param from
+     * @param to
+     * @param reverse
+     * @param forEntries
+     * @param <X>
+     * @return
+     */
     private <X> Iterator<X> chooseIterator(K from, K to, boolean reverse, boolean forEntries) {
         switch (transaction.isolationLevel) {
             case READ_UNCOMMITTED:

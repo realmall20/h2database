@@ -184,6 +184,7 @@ public final class Transaction {
         this.store = store;
         this.transactionId = transactionId;
         this.sequenceNum = sequenceNum;
+        //开启事务的时候会记录一个保存点
         this.statusAndLogId = new AtomicLong(composeState(status, logId, false));
         this.name = name;
         setTimeoutMillis(timeoutMillis);
@@ -217,8 +218,10 @@ public final class Transaction {
         while (true) {
             long currentState = statusAndLogId.get();
             long logId = getLogId(currentState);
+            //计算当前状态
             int currentStatus = getStatus(currentState);
             boolean valid;
+            //判断当前的状态能否被修改
             switch (status) {
                 case STATUS_ROLLING_BACK:
                     valid = currentStatus == STATUS_OPEN;
@@ -252,6 +255,7 @@ public final class Transaction {
                         "Transaction was illegally transitioned from {0} to {1}",
                         STATUS_NAMES[currentStatus], STATUS_NAMES[status]);
             }
+            //设置当前的状态为回滚的状态
             long newState = composeState(status, logId, hasRollback(currentState));
             if (statusAndLogId.compareAndSet(currentState, newState)) {
                 return currentState;
@@ -530,10 +534,13 @@ public final class Transaction {
      * @param savepointId the savepoint id
      */
     public void rollbackToSavepoint(long savepointId) {
+        //设置状态为 回滚状态，并且返回
         long lastState = setStatus(STATUS_ROLLING_BACK);
+        //通过状态获取操作日志
         long logId = getLogId(lastState);
         boolean success;
         try {
+            //从 当前的日志ID 回滚到 保存点
             store.rollbackTo(this, logId, savepointId);
         } finally {
             if (notificationRequested) {
