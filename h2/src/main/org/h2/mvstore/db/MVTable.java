@@ -509,7 +509,7 @@ public class MVTable extends RegularTable {
         //保存点，如果是多线程操作，如果去确定这个点
         long savepoint = t.setSavepoint();
         try {
-            //保证事务执行，不然有一个索引出现问题，回导致数据一致性出错
+            //保证事务执行，不然有一个索引出现问题，会导致数据一致性出错
             for (Index index : indexes) {
                 index.add(session, row);
             }
