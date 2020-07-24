@@ -11,6 +11,7 @@ import org.h2.mvstore.RootReference;
 
 /**
  * Snapshot of the map root and committing transactions.
+ * 当前 tree数的镜像数据
  *
  */
 final class Snapshot<K,V> {

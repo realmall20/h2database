@@ -390,12 +390,13 @@ public class MVPrimaryIndex extends BaseIndex implements MVIndex<Long,SearchRow>
 
     private Cursor find(SessionLocal session, Long first, Long last) {
         TransactionMap<Long,SearchRow> map = getMap(session);
+        //开始和结束相等，返回一行数据的索引
         if (first != null && last != null && first.longValue() == last.longValue()) {
             Row row = (Row)map.getFromSnapshot(first);
             ensureRowKey(row, first);
             return new SingleRowCursor(row);
         }
-        //封装成索引
+        //把iterator 封装成缩影
         return new MVStoreCursor(map.entryIterator(first, last));
     }
 

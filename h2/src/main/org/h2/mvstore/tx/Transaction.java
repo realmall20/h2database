@@ -328,7 +328,7 @@ public final class Transaction {
 
     /**
      * Mark an entry into a new SQL statement execution within this transaction.
-     *
+     * 在同一个事务里面执行另外一条sql的时候
      * @param maps
      *            set of maps used by transaction or statement is about to be executed
      */

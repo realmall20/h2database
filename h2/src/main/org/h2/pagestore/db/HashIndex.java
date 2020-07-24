@@ -30,6 +30,7 @@ import org.h2.value.Value;
 import org.h2.value.ValueNull;
 
 /**
+ * hash 索引
  * A unique index based on an in-memory hash map.
  */
 public class HashIndex extends BaseIndex {

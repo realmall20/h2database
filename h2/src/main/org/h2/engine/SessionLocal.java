@@ -187,6 +187,7 @@ public class SessionLocal extends Session implements TransactionStore.RollbackLi
     private TimeZoneProvider timeZone;
 
     /**
+     * 当事务提交的时候 分析table
      * Tables marked for ANALYZE after the current transaction is committed.
      * Prevents us calling ANALYZE repeatedly in large transactions.
      */

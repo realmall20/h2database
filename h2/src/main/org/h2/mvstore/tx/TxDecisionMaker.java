@@ -66,6 +66,12 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
         reset();
     }
 
+    /**
+     * 操作mvMap的时候，会通过 decide 判断是进行插入和是删除操作
+     * @param existingValue 当前存在map中的值
+     * @param providedValue original input value
+     * @return
+     */
     @Override
     public MVMap.Decision decide(VersionedValue<V> existingValue, VersionedValue<V> providedValue) {
         assert decision == null;

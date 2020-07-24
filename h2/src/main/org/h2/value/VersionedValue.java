@@ -32,7 +32,7 @@ public class VersionedValue<T> {
     }
 
     /**
-     * 获取当前值
+     * 获取当前值，当前值有可能还没有提交
      * @return
      */
     @SuppressWarnings("unchecked")
@@ -41,7 +41,7 @@ public class VersionedValue<T> {
     }
 
     /**
-     * 获取最后提交的值
+     * 获取事务已经提交诗句
      * @return
      */
     @SuppressWarnings("unchecked")

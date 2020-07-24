@@ -11,6 +11,7 @@ import org.h2.result.SearchRow;
 
 /**
  * A cursor with at most one row.
+ *
  */
 public class SingleRowCursor implements Cursor {
     private Row row;
