@@ -29,7 +29,9 @@ import org.h2.value.CompareMode;
  * A table store in a PageStore.
  */
 public class PageStoreTable extends RegularTable {
-
+    /**
+     * 全表扫描索引 ？
+     */
     private Index scanIndex;
     private long rowCount;
 

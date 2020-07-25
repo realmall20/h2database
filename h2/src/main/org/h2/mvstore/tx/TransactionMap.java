@@ -350,6 +350,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K, V> {
             K k = (K) key;
             // second parameter (value) is not really used,
             // since TxDecisionMaker has it embedded
+            //操作MvMap里面的数据
             result = map.operate(k, null, decisionMaker);
 
             MVMap.Decision decision = decisionMaker.getDecision();

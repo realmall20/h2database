@@ -10,6 +10,7 @@ package org.h2.value;
  * It contains current value and latest committed value if current one is uncommitted.
  * Also for uncommitted values it contains operationId - a combination of
  * transactionId and logId.
+ * 带有版本号的值，包含提交的值，还有当前的值
  *
  */
 public class VersionedValue<T> {

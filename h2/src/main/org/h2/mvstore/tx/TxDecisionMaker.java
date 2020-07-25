@@ -13,6 +13,7 @@ import org.h2.mvstore.type.DataType;
 import org.h2.value.VersionedValue;
 
 /**
+ * 事务操作类型
  * Class TxDecisionMaker is a base implementation of MVMap.DecisionMaker
  * to be used for TransactionMap modification.
  *
@@ -83,6 +84,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
                 (id = existingValue.getOperationId()) == 0 ||
                 // or it came from the same transaction
                 isThisTransaction(blockingId = TransactionStore.getTransactionId(id))) {
+            //把操作日志保存到undo log 里面
             logAndDecideToPut(existingValue, existingValue == null ? null : existingValue.getCommittedValue());
         } else if (isCommitted(blockingId)) {
             // Condition above means that entry belongs to a committing transaction.

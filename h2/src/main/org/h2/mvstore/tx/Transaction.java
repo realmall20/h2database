@@ -11,6 +11,7 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
+
 import org.h2.engine.IsolationLevel;
 import org.h2.mvstore.DataUtils;
 import org.h2.mvstore.MVMap;
@@ -65,7 +66,7 @@ public final class Transaction {
      * The status of a transaction that has been rolled back completely,
      * but undo operations are not finished yet.
      */
-    private static final int STATUS_ROLLED_BACK  = 5;
+    private static final int STATUS_ROLLED_BACK = 5;
 
     private static final String[] STATUS_NAMES = {
             "CLOSED", "OPEN", "PREPARED", "COMMITTED", "ROLLING_BACK", "ROLLED_BACK"
@@ -73,6 +74,7 @@ public final class Transaction {
     /**
      * How many bits of the "operation id" we store in the transaction belong to the
      * log id (the rest belong to the transaction id).
+     *
      */
     static final int LOG_ID_BITS = 40;
     private static final int LOG_ID_BITS1 = LOG_ID_BITS + 1;
@@ -100,6 +102,7 @@ public final class Transaction {
 
     /**
      * This is really a transaction identity, because it's not re-used.
+     *  事务真正的ID，唯一性判断？
      */
     final long sequenceNum;
 
@@ -133,12 +136,14 @@ public final class Transaction {
 
     /**
      * How long to wait for blocking transaction to commit or rollback.
+     * 堵塞事务的超时时间
      */
     int timeoutMillis;
 
     /**
      * Identification of the owner of this transaction,
      * usually the owner is a database session.
+     * 拥有人ID
      */
     private final int ownerId;
 
@@ -149,6 +154,7 @@ public final class Transaction {
 
     /**
      * Map on which this transaction is blocked.
+     * 堵塞
      */
     private String blockingMapName;
 
@@ -165,12 +171,12 @@ public final class Transaction {
     /**
      * RootReferences for undo log snapshots
      */
-    private RootReference<Long,Record<?,?>>[] undoLogRootReferences;
+    private RootReference<Long, Record<?, ?>>[] undoLogRootReferences;
 
     /**
      * Map of transactional maps for this transaction
      */
-    private final Map<Integer, TransactionMap<?,?>> transactionMaps = new HashMap<>();
+    private final Map<Integer, TransactionMap<?, ?>> transactionMaps = new HashMap<>();
 
     /**
      * The current isolation level.
@@ -205,12 +211,13 @@ public final class Transaction {
         return getStatus(statusAndLogId.get());
     }
 
-    RootReference<Long,Record<?,?>>[] getUndoLogRootReferences() {
+    RootReference<Long, Record<?, ?>>[] getUndoLogRootReferences() {
         return undoLogRootReferences;
     }
 
     /**
      * Changes transaction status to a specified value
+     *
      * @param status to be set
      * @return transaction state as it was before status change
      */
@@ -289,7 +296,7 @@ public final class Transaction {
 
     /**
      * Create a new savepoint.
-     *
+     * 获取保存点ID
      * @return the savepoint id
      */
     public long setSavepoint() {
@@ -320,6 +327,7 @@ public final class Transaction {
 
     /**
      * Whether this transaction has isolation level READ_COMMITTED or below.
+     *
      * @return true if isolation level is READ_COMMITTED or READ_UNCOMMITTED
      */
     public boolean allowNonRepeatableRead() {
@@ -329,11 +337,12 @@ public final class Transaction {
     /**
      * Mark an entry into a new SQL statement execution within this transaction.
      * 在同一个事务里面执行另外一条sql的时候
-     * @param maps
-     *            set of maps used by transaction or statement is about to be executed
+     *
+     * @param maps set of maps used by transaction or statement is about to be executed
      */
-    @SuppressWarnings({"unchecked","rawtypes"})
-    public void markStatementStart(HashSet<MVMap<Object,VersionedValue<Object>>> maps) {
+    @SuppressWarnings({"unchecked", "rawtypes"})
+    public void markStatementStart(HashSet<MVMap<Object, VersionedValue<Object>>> maps) {
+        //设置上一条记录已经完成
         markStatementEnd();
         if (txCounter == null) {
             txCounter = store.store.registerVersionUsage();
@@ -346,8 +355,8 @@ public final class Transaction {
             BitSet committingTransactions;
             do {
                 committingTransactions = store.committingTransactions.get();
-                for (MVMap<Object,VersionedValue<Object>> map : maps) {
-                    TransactionMap<?,?> txMap = openMapX(map);
+                for (MVMap<Object, VersionedValue<Object>> map : maps) {
+                    TransactionMap<?, ?> txMap = openMapX(map);
                     txMap.setStatementSnapshot(new Snapshot(map.flushAndGetRoot(), committingTransactions));
                 }
                 if (isReadCommitted()) {
@@ -359,8 +368,8 @@ public final class Transaction {
             // and committingTransactions mask tells us which of seemingly uncommitted changes
             // should be considered as committed.
             // Subsequent processing uses this snapshot info only.
-            for (MVMap<Object,VersionedValue<Object>> map : maps) {
-                TransactionMap<?,?> txMap = openMapX(map);
+            for (MVMap<Object, VersionedValue<Object>> map : maps) {
+                TransactionMap<?, ?> txMap = openMapX(map);
                 txMap.promoteSnapshot();
             }
         }
@@ -398,13 +407,15 @@ public final class Transaction {
 
     /**
      * Add a log entry.
+     * 添加undo load 到 transactionStore
      *
      * @param logRecord to append
-     *
      * @return key for the newly added undo log entry
      */
-    long log(Record<?,?> logRecord) {
+    long log(Record<?, ?> logRecord) {
+        //获取一个自增的值
         long currentState = statusAndLogId.getAndIncrement();
+        //获取日志ID
         long logId = getLogId(currentState);
         if (logId >= LOG_ID_LIMIT) {
             throw DataUtils.newMVStoreException(
@@ -412,7 +423,11 @@ public final class Transaction {
                     "Transaction {0} has too many changes",
                     transactionId);
         }
+        //获取当前的状态
         int currentStatus = getStatus(currentState);
+        /**
+         * 检查当前事务是否是open状态
+         */
         checkOpen(currentStatus);
         long undoKey = store.addUndoLogRecord(transactionId, logId, logRecord);
         return undoKey;
@@ -438,8 +453,8 @@ public final class Transaction {
     /**
      * Open a data map.
      *
-     * @param <K> the key type
-     * @param <V> the value type
+     * @param <K>  the key type
+     * @param <V>  the value type
      * @param name the name of the map
      * @return the transaction map
      */
@@ -450,16 +465,16 @@ public final class Transaction {
     /**
      * Open the map to store the data.
      *
-     * @param <K> the key type
-     * @param <V> the value type
-     * @param name the name of the map
-     * @param keyType the key data type
+     * @param <K>       the key type
+     * @param <V>       the value type
+     * @param name      the name of the map
+     * @param keyType   the key data type
      * @param valueType the value data type
      * @return the transaction map
      */
     public <K, V> TransactionMap<K, V> openMap(String name,
-                                                DataType<K> keyType,
-                                                DataType<V> valueType) {
+                                               DataType<K> keyType,
+                                               DataType<V> valueType) {
         MVMap<K, VersionedValue<V>> map = store.openMap(name, keyType, valueType);
         return openMapX(map);
     }
@@ -473,10 +488,10 @@ public final class Transaction {
      * @return the transactional map
      */
     @SuppressWarnings("unchecked")
-    public <K, V> TransactionMap<K,V> openMapX(MVMap<K,VersionedValue<V>> map) {
+    public <K, V> TransactionMap<K, V> openMapX(MVMap<K, VersionedValue<V>> map) {
         checkNotClosed();
         int id = map.getId();
-        TransactionMap<K,V> transactionMap = (TransactionMap<K,V>)transactionMaps.get(id);
+        TransactionMap<K, V> transactionMap = (TransactionMap<K, V>) transactionMaps.get(id);
         if (transactionMap == null) {
             transactionMap = new TransactionMap<>(this, map);
             transactionMaps.put(id, transactionMap);
@@ -515,6 +530,9 @@ public final class Transaction {
         } finally {
             if (isActive(previousStatus)) {
                 try {
+                    /**
+                     * 关闭事务
+                     */
                     store.endTransaction(this, hasChanges);
                 } catch (Throwable e) {
                     if (ex == null) {
@@ -598,8 +616,8 @@ public final class Transaction {
 
     private static boolean isActive(int status) {
         return status != STATUS_CLOSED
-            && status != STATUS_COMMITTED
-            && status != STATUS_ROLLED_BACK;
+                && status != STATUS_COMMITTED
+                && status != STATUS_ROLLED_BACK;
     }
 
     /**
@@ -608,7 +626,7 @@ public final class Transaction {
      * the change is the value before the change was applied.
      *
      * @param savepointId the savepoint id, 0 meaning the beginning of the
-     *            transaction
+     *                    transaction
      * @return the changes
      */
     public Iterator<TransactionStore.Change> getChanges(long savepointId) {
@@ -656,7 +674,7 @@ public final class Transaction {
         transactionMaps.clear();
         long lastState = setStatus(STATUS_CLOSED);
         store.store.deregisterVersionUsage(txCounter);
-        if((hasChanges(lastState) || hasRollback(lastState)) && notificationRequested) {
+        if ((hasChanges(lastState) || hasRollback(lastState)) && notificationRequested) {
             notifyAllWaitingTransactions();
         }
     }
@@ -670,8 +688,8 @@ public final class Transaction {
      * because both of them try to modify the same map entry.
      *
      * @param toWaitFor transaction to wait for
-     * @param mapName name of the map containing blocking entry
-     * @param key of the blocking entry
+     * @param mapName   name of the map containing blocking entry
+     * @param key       of the blocking entry
      * @return true if other transaction was closed and this one can proceed, false if timed out
      */
     public boolean waitFor(Transaction toWaitFor, String mapName, Object key) {
@@ -708,9 +726,9 @@ public final class Transaction {
     }
 
     private boolean isDeadlocked(Transaction toWaitFor) {
-        for(Transaction tx = toWaitFor, nextTx;
-            (nextTx = tx.blockingTransaction) != null && tx.getStatus() == Transaction.STATUS_OPEN;
-            tx = nextTx) {
+        for (Transaction tx = toWaitFor, nextTx;
+             (nextTx = tx.blockingTransaction) != null && tx.getStatus() == Transaction.STATUS_OPEN;
+             tx = nextTx) {
             if (nextTx == this) {
                 return true;
             }
@@ -723,10 +741,10 @@ public final class Transaction {
         notificationRequested = true;
         long state;
         int status;
-        while((status = getStatus(state = statusAndLogId.get())) != STATUS_CLOSED
+        while ((status = getStatus(state = statusAndLogId.get())) != STATUS_CLOSED
                 && status != STATUS_ROLLED_BACK && !hasRollback(state)) {
             long dur = until - System.currentTimeMillis();
-            if(dur <= 0) {
+            if (dur <= 0) {
                 return false;
             }
             try {
@@ -764,7 +782,7 @@ public final class Transaction {
 
 
     private static int getStatus(long state) {
-        return (int)(state >>> LOG_ID_BITS1) & STATUS_MASK;
+        return (int) (state >>> LOG_ID_BITS1) & STATUS_MASK;
     }
 
     private static long getLogId(long state) {
@@ -786,6 +804,6 @@ public final class Transaction {
         if (hasRollback) {
             status |= 1 << STATUS_BITS;
         }
-        return ((long)status << LOG_ID_BITS1) | logId;
+        return ((long) status << LOG_ID_BITS1) | logId;
     }
 }

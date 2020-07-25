@@ -245,6 +245,7 @@ public class TransactionStore {
     }
 
     private void markUndoLogAsCommitted(int transactionId) {
+        //添加一条undo log 日志
         addUndoLogRecord(transactionId, LOG_ID_MASK, Record.COMMIT_MARKER);
     }
 
@@ -268,6 +269,7 @@ public class TransactionStore {
      * Set the maximum transaction id, after which ids are re-used. If the old
      * transaction is still in use when re-using an old id, the new transaction
      * fails.
+     * 设置最大的事务ID
      *
      * @param max the maximum id
      */
@@ -296,12 +298,14 @@ public class TransactionStore {
      * @param transactionId the transaction id
      * @param logId         the log id
      * @return the operation id
+     * 获取操作ID ，通过事务ID和日志ID产生操作ID
      */
     static long getOperationId(int transactionId, long logId) {
         DataUtils.checkArgument(transactionId >= 0 && transactionId < (1 << (64 - LOG_ID_BITS)),
                 "Transaction id out of range: {0}", transactionId);
         DataUtils.checkArgument(logId >= 0 && logId <= LOG_ID_MASK,
                 "Transaction log id out of range: {0}", logId);
+        // 获取操作ID
         return ((long) transactionId << LOG_ID_BITS) | logId;
     }
 
@@ -310,6 +314,7 @@ public class TransactionStore {
      *
      * @param operationId the operation id
      * @return the transaction id
+     * 截取事务ID
      */
     static int getTransactionId(long operationId) {
         return (int) (operationId >>> LOG_ID_BITS);
@@ -329,6 +334,7 @@ public class TransactionStore {
      * Get the list of unclosed transactions that have pending writes.
      *
      * @return the list of transactions (sorted by id)
+     * 获取打开的事务
      */
     public List<Transaction> getOpenTransactions() {
         if (!init) {
@@ -357,6 +363,7 @@ public class TransactionStore {
 
     /**
      * Begin a new transaction.
+     * 开启一个事务
      *
      * @return the transaction
      */
@@ -483,6 +490,7 @@ public class TransactionStore {
      */
     void commit(Transaction t, boolean recovery) {
         if (!store.isClosed()) {
+            //如果事务没有关闭
             int transactionId = t.transactionId;
             // First, mark log as "committed".
             // It does not change the way this transaction is treated by others,
@@ -494,16 +502,19 @@ public class TransactionStore {
                 cursor = undoLog.cursor(null);
             } else {
                 cursor = undoLog.cursor(null);
+                //标记 undo lod 为提交状态
                 markUndoLogAsCommitted(transactionId);
             }
 
             // this is an atomic action that causes all changes
             // made by this transaction, to be considered as "committed"
+            //设置 commit 为true
             flipCommittingTransactionsBit(transactionId, true);
 
             CommitDecisionMaker<Object> commitDecisionMaker = new CommitDecisionMaker<>();
             try {
                 while (cursor.hasNext()) {
+                    //把所有的undo log 放到 提交的 map 中去
                     Long undoKey = cursor.next();
                     Record<?, ?> op = cursor.getValue();
                     int mapId = op.mapId;
@@ -513,16 +524,25 @@ public class TransactionStore {
                         commitDecisionMaker.setUndoKey(undoKey);
                         // second parameter (value) is not really
                         // used by CommitDecisionMaker
+                        // 放入到提交的map中去
                         map.operate(key, null, commitDecisionMaker);
                     }
                 }
+                //情况unto log
                 undoLog.clear();
             } finally {
+                //释放提交中的事务
                 flipCommittingTransactionsBit(transactionId, false);
             }
         }
     }
 
+    /**
+     * 释放提交中的事务
+     *
+     * @param transactionId
+     * @param flag
+     */
     private void flipCommittingTransactionsBit(int transactionId, boolean flag) {
         boolean success;
         do {
@@ -602,6 +622,7 @@ public class TransactionStore {
             assert original.get(txId);
             VersionedBitSet clone = original.clone();
             clone.clear(txId);
+            //保证线程安全
             success = openTransactions.compareAndSet(original, clone);
         } while (!success);
 
