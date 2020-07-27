@@ -538,7 +538,7 @@ public class TransactionStore {
     }
 
     /**
-     * 释放提交中的事务
+     *  添加 提交中的事务，做一次校验，防止同一个事务多次提交。
      *
      * @param transactionId
      * @param flag
@@ -547,6 +547,7 @@ public class TransactionStore {
         boolean success;
         do {
             BitSet original = committingTransactions.get();
+            //判断是否是重复提交，如果是重复提交，直接抛出异常
             assert original.get(transactionId) != flag : flag ? "Double commit" : "Mysterious bit's disappearance";
             BitSet clone = (BitSet) original.clone();
             clone.set(transactionId, flag);

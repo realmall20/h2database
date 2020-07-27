@@ -26,6 +26,11 @@ final class Snapshot<K,V> {
      */
     final BitSet committingTransactions;
 
+    /**
+     *
+     * @param root  当前提交的数据
+     * @param committingTransactions  正在提交的事务
+     */
     Snapshot(RootReference<K,V> root, BitSet committingTransactions) {
         //根路径
         this.root = root;

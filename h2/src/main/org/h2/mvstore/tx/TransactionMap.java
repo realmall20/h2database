@@ -121,6 +121,7 @@ public final class TransactionMap<K, V> extends AbstractMap<K, V> {
 
     /**
      * Get the size of the map as seen by this transaction.
+     * 获取 map的长度，包含已经提交的数据和当前事务的数据长度
      *
      * @return the size
      */
@@ -128,7 +129,9 @@ public final class TransactionMap<K, V> extends AbstractMap<K, V> {
         // getting coherent picture of the map, committing transactions, and undo logs
         // either from values stored in transaction (never loops in that case),
         // or current values from the transaction store (loops until moment of silence)
+        // 已经提交的数据的镜像
         Snapshot<K, VersionedValue<V>> snapshot;
+        // 本事务没有提交的数据
         RootReference<Long, Record<?, ?>>[] undoLogRootReferences;
         do {
             snapshot = getSnapshot();
@@ -545,11 +548,13 @@ public final class TransactionMap<K, V> extends AbstractMap<K, V> {
         // which they had at some recent moment in time.
         // In order to get such a "snapshot", we wait for a moment of silence,
         // when neither of the variables concurrently changes it's value.
+        //获取所有在提交中的事务
         AtomicReference<BitSet> holder = transaction.store.committingTransactions;
         BitSet committingTransactions = holder.get();
         while (true) {
             BitSet prevCommittingTransactions = committingTransactions;
-            //获取当前map的根路径
+            //TODO 获取当前commit map 的数据，当这个没有拷贝数据啊，如果数据变动了怎么了怎么处理？
+            //TODO 提交的事，这算什么镜像数据呢？
             RootReference<K, VersionedValue<V>> root = map.getRoot();
             committingTransactions = holder.get();
             if (committingTransactions == prevCommittingTransactions) {

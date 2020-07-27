@@ -26,17 +26,20 @@ final class Record<K,V> {
 
     /**
      * Map id for this change is related to
+     * 存放的数据对应的map Id
      */
     final int mapId;
 
     /**
      * Key of the changed map entry key
+     * map 里面对应的key
      */
     final K key;
 
     /**
      * Value of the entry before change.
      * It is null if entry did not exist before the change (addition).
+     * 老的数据，那新的数据怎么呢
      */
     final VersionedValue<V> oldValue;
 

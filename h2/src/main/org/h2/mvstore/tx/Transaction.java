@@ -74,7 +74,6 @@ public final class Transaction {
     /**
      * How many bits of the "operation id" we store in the transaction belong to the
      * log id (the rest belong to the transaction id).
-     *
      */
     static final int LOG_ID_BITS = 40;
     private static final int LOG_ID_BITS1 = LOG_ID_BITS + 1;
@@ -102,7 +101,7 @@ public final class Transaction {
 
     /**
      * This is really a transaction identity, because it's not re-used.
-     *  事务真正的ID，唯一性判断？
+     * 事务真正的ID，唯一性判断？
      */
     final long sequenceNum;
 
@@ -113,7 +112,7 @@ public final class Transaction {
      * bits 40      : overflow control bit, 1 indicates overflow
      * bits 39-0    : log id of the last entry in the undo log map
      *
-     * 事务的当前状态
+     * logId
      */
     private final AtomicLong statusAndLogId;
 
@@ -165,11 +164,13 @@ public final class Transaction {
 
     /**
      * Whether other transaction(s) are waiting for this to close.
+     * 事务的嵌套吗？
      */
     private volatile boolean notificationRequested;
 
     /**
      * RootReferences for undo log snapshots
+     * 只在读提交的时候需要
      */
     private RootReference<Long, Record<?, ?>>[] undoLogRootReferences;
 
@@ -180,6 +181,7 @@ public final class Transaction {
 
     /**
      * The current isolation level.
+     * 事务的隔离级别
      */
     final IsolationLevel isolationLevel;
 
@@ -297,6 +299,7 @@ public final class Transaction {
     /**
      * Create a new savepoint.
      * 获取保存点ID
+     *
      * @return the savepoint id
      */
     public long setSavepoint() {
@@ -336,7 +339,7 @@ public final class Transaction {
 
     /**
      * Mark an entry into a new SQL statement execution within this transaction.
-     * 在同一个事务里面执行另外一条sql的时候
+     * 开启一条sql的执行
      *
      * @param maps set of maps used by transaction or statement is about to be executed
      */
@@ -349,17 +352,20 @@ public final class Transaction {
         }
 
         if (maps != null && !maps.isEmpty()) {
-            // The purpose of the following loop is to get a coherent picture
-            // In order to get such a "snapshot", we wait for a moment of silence,
-            // when no new transaction were committed / closed.
+            /**
+             * 下面这个循环是产生一份镜像，保证在这个阶段没有新的事务提交或者关闭。
+             */
             BitSet committingTransactions;
             do {
+                //回去正在提交中的事务信息
                 committingTransactions = store.committingTransactions.get();
                 for (MVMap<Object, VersionedValue<Object>> map : maps) {
                     TransactionMap<?, ?> txMap = openMapX(map);
+                    //每一个事务设置一个镜像，这个是什么情况 ？？？
                     txMap.setStatementSnapshot(new Snapshot(map.flushAndGetRoot(), committingTransactions));
                 }
                 if (isReadCommitted()) {
+                    //如果事务隔离级别是 提交读
                     undoLogRootReferences = store.collectUndoLogRootReferences();
                 }
             } while (committingTransactions != store.committingTransactions.get());
@@ -368,6 +374,11 @@ public final class Transaction {
             // and committingTransactions mask tells us which of seemingly uncommitted changes
             // should be considered as committed.
             // Subsequent processing uses this snapshot info only.
+            /**
+             * 我的理解，在提交读的隔离级别下，别的事务变更的数据但是没有提交的数据是读不到的
+             * 但是本地事务变更的数据是可以读到的。
+             * 如果是重复读的话，上次的数据和这次读到的数据应该是一样
+             */
             for (MVMap<Object, VersionedValue<Object>> map : maps) {
                 TransactionMap<?, ?> txMap = openMapX(map);
                 txMap.promoteSnapshot();

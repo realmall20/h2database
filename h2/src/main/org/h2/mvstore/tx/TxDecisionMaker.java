@@ -76,7 +76,9 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
     @Override
     public MVMap.Decision decide(VersionedValue<V> existingValue, VersionedValue<V> providedValue) {
         assert decision == null;
+        //操作ID
         long id;
+        //阻塞ID ，事务的ID
         int blockingId;
         // if map does not have that entry yet
         if (existingValue == null ||
@@ -84,9 +86,10 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
                 (id = existingValue.getOperationId()) == 0 ||
                 // or it came from the same transaction
                 isThisTransaction(blockingId = TransactionStore.getTransactionId(id))) {
-            //把操作日志保存到undo log 里面
+            //如果阻塞ID是当前事务，把操作日志保存到undo log 里面
             logAndDecideToPut(existingValue, existingValue == null ? null : existingValue.getCommittedValue());
         } else if (isCommitted(blockingId)) {
+            // 当前事务是否已经提交
             // Condition above means that entry belongs to a committing transaction.
             // We assume that we are looking at the final value for this transaction,
             // and if it's not the case, then it will fail later,
@@ -98,6 +101,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
             // this entry comes from a different transaction, and this
             // transaction is not committed yet
             // should wait on blockingTransaction that was determined earlier
+            //有事务堵塞，所以暂时不操作
             lastValue = existingValue.getCurrentValue();
             decision = MVMap.Decision.ABORT;
         } else if (isRepeatedOperation(id)) {
@@ -154,6 +158,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
     }
 
     /**
+     * 放置数据到undo log 里面
      * Create undo log entry and record for future references
      * {@link org.h2.mvstore.MVMap.Decision#PUT} decision along with last known
      * committed value
@@ -164,6 +169,7 @@ class TxDecisionMaker<K,V> extends MVMap.DecisionMaker<VersionedValue<V>> {
      */
     MVMap.Decision logAndDecideToPut(VersionedValue<V> valueToLog, V lastValue) {
         undoKey = transaction.log(new Record<>(mapId, key, valueToLog));
+        //最新的数据
         this.lastValue = lastValue;
         return setDecision(MVMap.Decision.PUT);
     }
