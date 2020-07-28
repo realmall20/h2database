@@ -55,11 +55,13 @@ public final class TransactionMap<K, V> extends AbstractMap<K, V> {
      * Snapshot of this map as of beginning of transaction or
      * first usage within transaction or
      * beginning of the statement, depending on isolation level
+     *
      */
     private Snapshot<K, VersionedValue<V>> snapshot;
 
     /**
      * Snapshot of this map as of beginning of beginning of the statement
+     * 单个sql操作结果的数据镜像
      */
     private Snapshot<K, VersionedValue<V>> statementSnapshot;
 

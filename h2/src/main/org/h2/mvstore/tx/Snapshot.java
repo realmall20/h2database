@@ -18,11 +18,13 @@ final class Snapshot<K,V> {
 
     /**
      * The root reference.
+     * 根路径地址
      */
     final RootReference<K,V> root;
 
     /**
      * The committing transactions (see also TransactionStore.committingTransactions).
+     * 正在提交中的事务
      */
     final BitSet committingTransactions;
 
