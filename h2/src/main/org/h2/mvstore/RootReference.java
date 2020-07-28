@@ -32,7 +32,7 @@ public final class RootReference<K, V> {
     private final byte holdCount;
     /**
      * Lock owner thread id.
-     * 当前拥有人
+     * 当前拥有，初始化的时候就已经指定的拥有人，那就说明是线程安全的？
      */
     private final long ownerId;
     /**
@@ -88,7 +88,11 @@ public final class RootReference<K, V> {
         this.appendCounter = r.appendCounter;
     }
 
-    // This one is used for locking
+    /**
+     * 锁住该对象的时候
+     * @param r
+     * @param attempt
+     */
     private RootReference(RootReference<K, V> r, int attempt) {
         this.root = r.root;
         this.version = r.version;
@@ -170,7 +174,7 @@ public final class RootReference<K, V> {
 
     /**
      * Update the page, possibly keeping it locked.
-     *
+     * 更新page数据
      * @param page          the page
      * @param keepLocked    whether to keep it locked
      * @param appendCounter number of items in append buffer
@@ -182,7 +186,7 @@ public final class RootReference<K, V> {
 
     /**
      * Removed old versions that are not longer used.
-     * 删除多少版本之前的数据
+     * 删除没有使用的多少版本之前的数据
      *
      * @param oldestVersionToKeep the oldest version that needs to be retained
      */
@@ -211,7 +215,7 @@ public final class RootReference<K, V> {
     }
 
     /**
-     * 是否可以被更新
+     * 当前对象没有被线程持有，或者持有人是当前线，可以更新数据
      *
      * @return
      */
@@ -220,6 +224,10 @@ public final class RootReference<K, V> {
         return isFree() || ownerId == Thread.currentThread().getId();
     }
 
+    /**
+     * 该对象是否被当前线程锁定
+     * @return
+     */
     public boolean isLockedByCurrentThread() {
         return holdCount != 0 && ownerId == Thread.currentThread().getId();
     }
