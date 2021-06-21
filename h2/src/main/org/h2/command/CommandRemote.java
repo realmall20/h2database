@@ -26,6 +26,7 @@ import org.h2.value.ValueLob;
 import org.h2.value.ValueNull;
 
 /**
+ * 远程命令，暂时不关心
  * Represents the client-side part of a SQL statement.
  * This class is not used in embedded mode.
  */

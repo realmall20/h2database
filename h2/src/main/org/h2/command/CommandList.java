@@ -16,6 +16,7 @@ import org.h2.result.ResultInterface;
 import org.h2.result.ResultWithGeneratedKeys;
 
 /**
+ * 命令集合
  * Represents a list of SQL statements.
  */
 class CommandList extends Command {

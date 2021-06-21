@@ -993,11 +993,13 @@ public abstract class Page<K, V> implements Cloneable {
 
         /**
          * The position, if known, or 0.
+         * 页在文件的起始位置，比如第二页是从16kb之后，那就是16*1024
          */
         private long pos;
 
         /**
          * The page, if in memory, or null.
+         *  page对象，在内存中，从磁盘里面读取，或者没有读取，直接为空
          */
         private Page<K, V> page;
 
@@ -1441,7 +1443,7 @@ public abstract class Page<K, V> implements Cloneable {
 
 
     /**
-     * 叶子
+     * 叶子 ，没有父节点的关联。
      *
      * @param <K>
      * @param <V>

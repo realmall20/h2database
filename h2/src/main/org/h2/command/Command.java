@@ -23,6 +23,7 @@ import org.h2.result.ResultWithPaddedStrings;
 import org.h2.util.MathUtils;
 
 /**
+ *
  * Represents a SQL statement. This object is only used on the server side.
  */
 public abstract class Command implements CommandInterface {

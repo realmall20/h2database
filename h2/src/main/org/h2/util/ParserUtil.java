@@ -5,6 +5,9 @@
  */
 package org.h2.util;
 
+/**
+ * sql解析工具类，sql 解析成 AST 树信息
+ */
 public class ParserUtil {
 
     /**

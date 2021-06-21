@@ -11,6 +11,7 @@ import org.h2.result.ResultInterface;
 import org.h2.result.ResultWithGeneratedKeys;
 
 /**
+ * 命令接口
  * Represents a SQL statement.
  */
 public interface CommandInterface extends AutoCloseable {

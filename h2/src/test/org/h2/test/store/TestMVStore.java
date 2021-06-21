@@ -17,6 +17,7 @@ import java.util.TreeMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+
 import org.h2.mvstore.Chunk;
 import org.h2.mvstore.Cursor;
 import org.h2.mvstore.DataUtils;
@@ -52,67 +53,80 @@ public class TestMVStore extends TestBase {
 
     @Override
     public void test() throws Exception {
-        testRemoveMapRollback();
-        testProvidedFileStoreNotOpenedAndClosed();
-        testVolatileMap();
-        testEntrySet();
-        testCompressEmptyPage();
-        testCompressed();
-        testFileFormatExample();
-        testMaxChunkLength();
-        testCacheInfo();
-        testRollback();
-        testVersionsToKeep();
-        testVersionsToKeep2();
-        testRemoveMap();
-        testIsEmpty();
-        testOffHeapStorage();
-        testNewerWriteVersion();
-        testCompactFully();
-        testBackgroundExceptionListener();
-        testOldVersion();
-        testAtomicOperations();
-        testWriteBuffer();
-        testWriteDelay();
-        testEncryptedFile();
-        testFileFormatChange();
-        testRecreateMap();
-        testRenameMapRollback();
-        testCustomMapType();
-        testCacheSize();
-        testConcurrentOpen();
-        testFileHeader();
-        testFileHeaderCorruption();
-        testIndexSkip();
-        testIndexSkipReverse();
-        testMinMaxNextKey();
-        testStoreVersion();
-        testIterateOldVersion();
-        testObjects();
-        testExample();
-        testExampleMvcc();
-        testOpenStoreCloseLoop();
-        testVersion();
-        testTruncateFile();
-        testFastDelete();
-        testRollbackInMemory();
-        testRollbackStored();
-        testMeta();
-        testInMemory();
-        testLargeImport();
-        testBtreeStore();
-        testCompact();
-        testCompactMapNotOpen();
-        testReuseSpace();
-        testRandom();
-        testKeyValueClasses();
-        testIterate();
-        testIterateReverse();
-        testCloseTwice();
-        testSimple();
+        testInsertAndRemove();
+//        testRemoveMapRollback();
+//        testProvidedFileStoreNotOpenedAndClosed();
+//        testVolatileMap();
+//        testEntrySet();
+//        testCompressEmptyPage();
+//        testCompressed();
+//        testFileFormatExample();
+//        testMaxChunkLength();
+//        testCacheInfo();
+//        testRollback();
+//        testVersionsToKeep();
+//        testVersionsToKeep2();
+//        testRemoveMap();
+//        testIsEmpty();
+//        testOffHeapStorage();
+//        testNewerWriteVersion();
+//        testCompactFully();
+//        testBackgroundExceptionListener();
+//        testOldVersion();
+//        testAtomicOperations();
+//        testWriteBuffer();
+//        testWriteDelay();
+//        testEncryptedFile();
+//        testFileFormatChange();
+//        testRecreateMap();
+//        testRenameMapRollback();
+//        testCustomMapType();
+//        testCacheSize();
+//        testConcurrentOpen();
+//        testFileHeader();
+//        testFileHeaderCorruption();
+//        testIndexSkip();
+//        testIndexSkipReverse();
+//        testMinMaxNextKey();
+//        testStoreVersion();
+//        testIterateOldVersion();
+//        testObjects();
+//        testExample();
+//        testExampleMvcc();
+//        testOpenStoreCloseLoop();
+//        testVersion();
+//        testTruncateFile();
+//        testFastDelete();
+//        testRollbackInMemory();
+//        testRollbackStored();
+//        testMeta();
+//        testInMemory();
+//        testLargeImport();
+//        testBtreeStore();
+//        testCompact();
+//        testCompactMapNotOpen();
+//        testReuseSpace();
+//        testRandom();
+//        testKeyValueClasses();
+//        testIterate();
+//        testIterateReverse();
+//        testCloseTwice();
+//        testSimple();
 
         // longer running tests
-        testLargerThan2G();
+//        testLargerThan2G();
+    }
+
+    private void testInsertAndRemove() {
+        try (MVStore store = new MVStore.Builder().
+                open()) {
+            MVMap<Integer, String> map = store.openMap("test");
+            for (int i = 0; i < 20; i++) {
+                map.put(i, "hello " + i);
+            }
+            map.toString();
+
+        }
     }
 
     private void testRemoveMapRollback() {
@@ -373,8 +387,8 @@ public class TestMVStore extends TestBase {
         String fileName = getBaseDir() + "/" + getTestName();
         FileUtils.delete(fileName);
         try (MVStore s = new MVStore.Builder().
-            fileName(fileName).
-            open()) {
+                fileName(fileName).
+                open()) {
             MVMap<Integer, Integer> map = s.openMap("data");
             map.put(1, 1);
             assertEquals(1, map.get(1).intValue());
@@ -2076,7 +2090,7 @@ public class TestMVStore extends TestBase {
             MVMap<Integer, String> map = store.openMap("test");
             long last = System.nanoTime();
             String data = new String(new char[2500]).replace((char) 0, 'x');
-            for (int i = 0;; i++) {
+            for (int i = 0; ; i++) {
                 map.put(i, data);
                 if (i % 10000 == 0) {
                     store.commit();
@@ -2112,7 +2126,7 @@ public class TestMVStore extends TestBase {
     /**
      * Open a store for the given file name, using a small page size.
      *
-     * @param fileName the file name (null for in-memory)
+     * @param fileName      the file name (null for in-memory)
      * @param pageSplitSize the page split size
      * @return the store
      */

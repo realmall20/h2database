@@ -298,6 +298,7 @@ import org.h2.value.ValueVarbinary;
 import org.h2.value.ValueVarchar;
 
 /**
+ * sql 解析成 命令解析器
  * The parser is used to convert a SQL statement string to an command object.
  *
  * @author Thomas Mueller

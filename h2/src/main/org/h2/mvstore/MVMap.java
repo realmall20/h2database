@@ -1368,7 +1368,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
      * TODO 替换page ？
      *
      * @param path                key 对应的叶子节点的父亲的游标节点
-     * @param replacement         对节点进行删除，新增过后的copy 节点
+     * @param replacement         叶子节点
      * @param unsavedMemoryHolder 没有保存的内存使用
      * @param <K>
      * @param <V>
@@ -1781,6 +1781,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
         while (true) {
             RootReference<K, V> rootReference = flushAndGetRoot();
             boolean locked = rootReference.isLockedByCurrentThread();
+            //如果没有被锁住
             if (!locked) {
                 if (attempt++ == 0) {
                     beforeWrite();
@@ -1833,9 +1834,13 @@ public class MVMap<K, V> extends AbstractMap<K, V>
 
                         if (p.getTotalCount() == 1 && pos != null) {
                             int keyCount;
+                            /**
+                             * 游标递归查找root节点
+                             */
                             do {
                                 p = pos.page;
                                 index = pos.index;
+
                                 pos = pos.parent;
                                 keyCount = p.getKeyCount();
                                 // condition below should always be false, but older
@@ -1881,6 +1886,7 @@ public class MVMap<K, V> extends AbstractMap<K, V>
                                 Page<K, V> split = p.split(at);
                                 unsavedMemoryHolder.value += p.getMemory() + split.getMemory();
                                 if (pos == null) {
+                                    //创建一个包含1个长度的数组
                                     K[] keys = p.createKeyStorage(1);
                                     keys[0] = k;
                                     Page.PageReference<K, V>[] children = Page.createRefStorage(2);

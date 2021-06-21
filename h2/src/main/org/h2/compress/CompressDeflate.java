@@ -14,6 +14,7 @@ import org.h2.api.ErrorCode;
 import org.h2.message.DbException;
 
 /**
+ * 文件压缩
  * This is a wrapper class for the Deflater class.
  * This algorithm supports the following options:
  * <ul>
